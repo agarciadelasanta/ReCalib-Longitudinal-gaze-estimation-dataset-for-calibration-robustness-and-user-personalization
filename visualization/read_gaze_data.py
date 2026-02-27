@@ -1,12 +1,12 @@
 import cv2
 import json
 import numpy as np
-import scene_operations as scene
+from scene_operations import Plane, Screen, rotateVector, createScreenCamMsSimple, createBothRotMat, transformMhProws, computeCameraMatrix, projectPoints
 from head_model import load_head_model
 from scene_3d_plots import trackingEnviroment3DPlotter
 from scene_2d_plots import trackingScreen2DPlotter
-import math 
-#from ...src.modules.utils import calc_vec_and_xy_angles_error
+from math import pi, sin, cos, tan
+from utils import pog_converter_from_cm_2_px, pog_calc, Setup_specs
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
@@ -54,7 +54,7 @@ class Read_gaze_data:
         self.pogPx_screen = []
         self.eye3DCenter_cam = []
         
-        self.cameraPlane_cam = scene.Plane(np.array([0,0,0]), np.array([0,0,1]))
+        self.cameraPlane_cam = Plane(np.array([0,0,0]), np.array([0,0,1]))
         self.gazePrediction = None
         self.predictionHead3D_cam = None
         self.pogCmCalibratedPrediction_cam = []
@@ -112,7 +112,7 @@ class Read_gaze_data:
         self.rightEye3DCenter_cam =  np.array(self.data["rightEyeCenter"])
     
     def rotated_vector_correction(self):
-        self.gaze_corrected = scene.rotateVector(np.asarray(self.gaze, dtype=np.float32), np.array([0, 0, -self.roll]))
+        self.gaze_corrected = rotateVector(np.asarray(self.gaze, dtype=np.float32), np.array([0, 0, -self.roll]))
         self.gaze_corrected = self.gaze_corrected / np.linalg.norm(self.gaze_corrected)
         self.gaze = self.gaze_corrected
         roll_values = np.linspace(-np.pi, np.pi, 10)
@@ -120,7 +120,7 @@ class Read_gaze_data:
         self.gaze_corrected_range = []
         
         for roll_aux in roll_values:
-            self.gaze_corrected_range.append(scene.rotateVector(np.asarray(self.gaze, dtype=np.float32), np.array([0, 0, -roll_aux])))
+            self.gaze_corrected_range.append(rotateVector(np.asarray(self.gaze, dtype=np.float32), np.array([0, 0, -roll_aux])))
 
     def sceneReconstruction(self):
         # Head model
@@ -141,33 +141,33 @@ class Read_gaze_data:
         # Image and POG
         self.pogPx_screen = (self.pos[0], self.pos[1])
 
-        screenOps = scene.Screen(self.screen_mm[0], 
+        screenOps = Screen(self.screen_mm[0], 
                                  self.screen_mm[1], 
                                  self.screen_pixels[0]*self.zoom, 
                                  self.screen_pixels[1]*self.zoom,
                                  self.zoom)
         #Pog Px -> Cam
         Pogcm_screen = screenOps.fromPxToCm(self.pogPx_screen)
-        self.Pogcm_cam = scene.transformMhProws(self.Mcam_screen, Pogcm_screen)
+        self.pog_cm_cam = transformMhProws(self.Mcam_screen, Pogcm_screen)
 
     def rotationMatrixGen(self):
         ### Rotation matrix
-        self.Mscreen_cam, self.Mcam_screen = scene.createScreenCamMsSimple(self.screen_o_cam_t, self.screen_o_cam_r)
+        self.Mscreen_cam, self.Mcam_screen = createScreenCamMsSimple(self.screen_o_cam_t, self.screen_o_cam_r)
         self.VRhead_cam = np.array(self.hpe[0:3])
         self.VThead_cam = np.array(self.hpe[3:6])
-        self.Mhead_cam, self.Mcam_head  = scene.createBothRotMat(self.VRhead_cam, self.VThead_cam)
+        self.Mhead_cam, self.Mcam_head  = createBothRotMat(self.VRhead_cam, self.VThead_cam)
         
     def axisDefinition(self):
         #head axis
         headAxis_head  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
-        self.headAxis_cam  = scene.transformMhProws(self.Mhead_cam, headAxis_head)
+        self.headAxis_cam  = transformMhProws(self.Mhead_cam, headAxis_head)
 
         # Camera axes
         self.cameraAxis_cam = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
 
         # screen axis
         screenAxis_screen  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
-        self.screenAxis_cam     = scene.transformMhProws(self.Mcam_screen, screenAxis_screen)
+        self.screenAxis_cam     = transformMhProws(self.Mcam_screen, screenAxis_screen)
 
     def screenParametersSetup(self):
         # Screen and camera setup
@@ -231,7 +231,7 @@ class Read_gaze_data:
                                         self.data["posCam_mm"]["z"]])
 
         if "rotCam" not in self.data or "x" not in self.data["rotCam"] or "y" not in self.data["rotCam"] or "z" not in self.data["rotCam"]:
-            self.screen_o_cam_r = np.array([0, math.pi, 0])
+            self.screen_o_cam_r = np.array([0, pi, 0])
         # else:
         #     self.screenWmm = 260
         #     self.screenHmm = 173
@@ -274,13 +274,19 @@ class Read_gaze_data:
 
     def screenSetup(self):
         screenFrame_screen = np.array([[0, 0, 0], [self.screenWmm, 0, 0], [self.screenWmm, self.screenHmm, 0], [0, self.screenHmm, 0]])
-        self.screenFrame_cam    = scene.transformMhProws(self.Mcam_screen, screenFrame_screen)
-        self.screen = scene.Screen(self.screenWmm, self.screenHmm, self.screenWpx, self.screenHpx, self.zoom)
+        self.screenFrame_cam    = transformMhProws(self.Mcam_screen, screenFrame_screen)
+        self.screen = Screen(self.screenWmm, self.screenHmm, self.screenWpx, self.screenHpx, self.zoom)
+        self.setup_specs = Setup_specs(screen_width_px=self.screenWpx, screen_height_px=self.screenHpx, 
+                                screen_width_mm=self.screenWmm, screen_height_mm=self.screenHmm, 
+                                screen_orientation=self.screen_orientation, 
+                                camera_pos_x=0, camera_pos_y=10, camera_pos_z=0, 
+                                camera_rot_x=0, camera_rot_y=pi, camera_rot_z=0, 
+                                zoom=self.zoom)
 
     def headSetup(self):
         # Head model
         head3D_head = load_head_model()*10
-        self.head3D_cam = scene.transformMhProws(self.Mhead_cam, head3D_head)
+        self.head3D_cam = transformMhProws(self.Mhead_cam, head3D_head)
 
         # Eyes centers 3D
         rightOut_cam = self.head3D_cam[36]
@@ -291,8 +297,8 @@ class Read_gaze_data:
         self.leftEye3DCenter_cam     = 0.5 * (leftOut_cam + leftIn_cam)
 
         # Head projection
-        projeMat = scene.computeCameraMatrix((self.height, self.height), (0.5*self.height, 0.5*self.width))
-        head2D_cam   = scene.projectPoints(projeMat, self.head3D_cam)
+        projeMat = computeCameraMatrix((self.height, self.height), (0.5*self.height, 0.5*self.width))
+        head2D_cam   = projectPoints(projeMat, self.head3D_cam)
         rightOut2D_cam = head2D_cam[36]
         rightIn2D_cam  = head2D_cam[39]
         leftOut2D_cam  = head2D_cam[45]
@@ -304,9 +310,9 @@ class Read_gaze_data:
 
     def addHeadPrediction(self, predictionHead3D_cam, predictionMhead_cam, predictionVRhead_cam, predictionVThead_cam):
         predHeadAxis_head  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
-        self.predHeadAxis_cam  = scene.transformMhProws(predictionMhead_cam, predHeadAxis_head)
+        self.predHeadAxis_cam  = transformMhProws(predictionMhead_cam, predHeadAxis_head)
         self.predictionHead3D_cam = Read_gaze_data.__convert_head_format(predictionHead3D_cam)
-        self.predictionHead3D_cam  = scene.transformMhProws(predictionMhead_cam, self.predictionHead3D_cam)
+        self.predictionHead3D_cam  = transformMhProws(predictionMhead_cam, self.predictionHead3D_cam)
 
         vec_rot, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.hpe[0:3], predictionVRhead_cam, error_per_component=True)
         euclidean_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.hpe[3:6], predictionVThead_cam)
@@ -323,29 +329,30 @@ class Read_gaze_data:
             )
         )
 
+    def calc_pog_from_gaze_vec(self, eye_gaze_vector_cam, eye_center_3d_cam):
+        #Raw pog calc in the screen
+        R_old_new = self.setup_specs.Mcam_screen[:3, :3]
+        eye_gaze_vector_screen = R_old_new.T @ eye_gaze_vector_cam 
+        eye_center_3d_screen = transformMhProws(self.setup_specs.Mscreen_cam, eye_center_3d_cam)
+        pog_cm_screen = pog_calc(eye_gaze_vector_screen, eye_center_3d_screen)
+        pog_cm_cam = transformMhProws(self.setup_specs.Mcam_screen, pog_cm_screen)
+        pog_px = pog_converter_from_cm_2_px(pog_cm_screen, self.setup_specs)
+        
+        return  pog_cm_cam, pog_px
+
     @staticmethod
     def __convert_head_format(predictionHead3D_cam: np.ndarray):
 
         head_3D = np.array([np.array([-headAux.x, headAux.y, headAux.z]) for headAux in predictionHead3D_cam])
 
         return head_3D
-        # main_key_features_indices = [
-        #     33,  # Left eye outer corner
-        #     133, # Left eye inner corner
-        #     362, # Right eye outer corner
-        #     263, # Right eye inner corner
-        #     1,   # Nose tip
-        #     61,  # Mouth left corner
-        #     291, # Mouth right corner
-        # ]
 
-        
-    def addGazePrediction(self, gazePrediction_cam: np.ndarray, eye3DPredictionCenter_cam: np.ndarray, pogPredictionRawPx_screen: np.ndarray, pogPredictionPx_screen: np.ndarray, pog_cm_cam: np.ndarray):        
-        self.eye3DPredictionCenter_cam = eye3DPredictionCenter_cam
-        self.gazePrediction = gazePrediction_cam
-        self.pogPrediction_cam = pog_cm_cam
+    def addGazePrediction(self, gazePrediction):        
+        self.eye3DPredictionCenter_cam = self.data["gaze"]["origin"]
+        self.gazePrediction = gazePrediction
 
-        #self.pogPrediction_cam = self.cameraPlane_cam.intersect(self.eye3DPredictionCenter_cam, self.gazePrediction)
+        self.pogPrediction_cm, self.pogPredictionPx_screen = self.calc_pog_from_gaze_vec(self.gazePrediction, self.eye3DPredictionCenter_cam)
+
         
         vec_rot_error, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.gaze, self.gazePrediction, error_per_component=True)
         print(
@@ -354,17 +361,15 @@ class Read_gaze_data:
             )
         )
 
-        eye3d_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.eye3DCenter_cam, self.eye3DPredictionCenter_cam)
+        # eye3d_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.eye3DCenter_cam, self.eye3DPredictionCenter_cam)
 
-        print(
-            "eye3d_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, eye3d gt: {}, eye3d pred: {}".format(
-                eye3d_error, x_error, y_error, z_error, self.eye3DCenter_cam, self.eye3DPredictionCenter_cam
-            )
-        )
+        # print(
+        #     "eye3d_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, eye3d gt: {}, eye3d pred: {}".format(
+        #         eye3d_error, x_error, y_error, z_error, self.eye3DCenter_cam, self.eye3DPredictionCenter_cam
+        #     )
+        # )
 
         # Pogcm_cam
-        self.pogPredictionPx_screen = pogPredictionPx_screen
-        self.pogPredictionRawPx_screen = pogPredictionRawPx_screen
         
         pogPX_error, [x_error, y_error] = Read_gaze_data.__calc_dist_error(self.pogPx_screen, self.pogPredictionPx_screen)
 
@@ -374,13 +379,54 @@ class Read_gaze_data:
             )
         )
 
-        pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(pog_cm_cam, self.pogPrediction_cam)
+        pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.pogPrediction_cm, self.pogPrediction_cam)
 
         print(
             "pogMM_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, pogMM gt: {}, pogMM pred: {}".format(
-                pogMM_error, x_error, y_error, z_error, pog_cm_cam, self.pogPrediction_cam
+                pogMM_error, x_error, y_error, z_error, self.pogPrediction_cm, self.pogPrediction_cam
             )
         )
+
+    # def addGazePrediction(self, gazePrediction_cam: np.ndarray, eye3DPredictionCenter_cam: np.ndarray, pogPredictionRawPx_screen: np.ndarray, pogPredictionPx_screen: np.ndarray, pog_cm_cam: np.ndarray):        
+    #     self.eye3DPredictionCenter_cam = eye3DPredictionCenter_cam
+    #     self.gazePrediction = gazePrediction_cam
+    #     self.pogPrediction_cam = pog_cm_cam
+
+        
+    #     vec_rot_error, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.gaze, self.gazePrediction, error_per_component=True)
+    #     print(
+    #         "gaze_error:  {:.2f}, x_error: {:.2f}, y_error: {:.2f}, gaze gt: {}, gaze pred: {}".format(
+    #             vec_rot_error, x_rot, y_rot, self.gaze, self.gazePrediction
+    #         )
+    #     )
+
+    #     eye3d_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.eye3DCenter_cam, self.eye3DPredictionCenter_cam)
+
+    #     print(
+    #         "eye3d_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, eye3d gt: {}, eye3d pred: {}".format(
+    #             eye3d_error, x_error, y_error, z_error, self.eye3DCenter_cam, self.eye3DPredictionCenter_cam
+    #         )
+    #     )
+
+    #     # Pogcm_cam
+    #     self.pogPredictionPx_screen = pogPredictionPx_screen
+    #     self.pogPredictionRawPx_screen = pogPredictionRawPx_screen
+        
+    #     pogPX_error, [x_error, y_error] = Read_gaze_data.__calc_dist_error(self.pogPx_screen, self.pogPredictionPx_screen)
+
+    #     print(
+    #         "pogPX_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, pogPX gt: {}, pogPX pred: {}".format(
+    #             pogPX_error, x_error, y_error, self.pogPx_screen, self.pogPredictionPx_screen
+    #         )
+    #     )
+
+    #     pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(pog_cm_cam, self.pogPrediction_cam)
+
+    #     print(
+    #         "pogMM_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, pogMM gt: {}, pogMM pred: {}".format(
+    #             pogMM_error, x_error, y_error, z_error, pog_cm_cam, self.pogPrediction_cam
+    #         )
+    #     )
 
     def plot3D(self):
         #Cam coordinate system
