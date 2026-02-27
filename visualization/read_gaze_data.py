@@ -1,13 +1,13 @@
 import cv2
 import json
+import math
 import numpy as np
-from scene_operations import Plane, Screen, rotateVector, createScreenCamMsSimple, createBothRotMat, transformMhProws, computeCameraMatrix, projectPoints
+from scene_operations import Plane, rotateVector, createBothRotMat, transformMhProws, computeCameraMatrix, projectPoints
 from head_model import load_head_model
 from scene_3d_plots import trackingEnviroment3DPlotter
 from scene_2d_plots import trackingScreen2DPlotter
-from math import pi, sin, cos, tan
+from math import pi
 from utils import pog_converter_from_cm_2_px, pog_calc, Setup_specs
-from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
 class Read_gaze_data:
@@ -135,27 +135,18 @@ class Read_gaze_data:
             self.rotated_vector_correction()
 
     def getPOGinTheScreen(self):
-        #self.pos = [int(x*y*self.zoom) for x, y in zip(self.data["percentLookAtPoint"],  self.screen_pixels)]
-        #self.pos = np.array([int(self.pos["x"]), int(self.pos["y"])])
-        
         # Image and POG
         self.pogPx_screen = (self.pos[0], self.pos[1])
 
-        screenOps = Screen(self.screen_mm[0], 
-                                 self.screen_mm[1], 
-                                 self.screen_pixels[0]*self.zoom, 
-                                 self.screen_pixels[1]*self.zoom,
-                                 self.zoom)
-        #Pog Px -> Cam
-        Pogcm_screen = screenOps.fromPxToCm(self.pogPx_screen)
-        self.pog_cm_cam = transformMhProws(self.Mcam_screen, Pogcm_screen)
+        # Pog Px -> Cam (using setup_specs instead of standalone Screen)
+        Pogcm_screen = self.setup_specs.from_px_to_cm(self.pogPx_screen)
+        self.pog_cm_cam = transformMhProws(self.setup_specs.Mcam_screen, Pogcm_screen)
 
     def rotationMatrixGen(self):
-        ### Rotation matrix
-        self.Mscreen_cam, self.Mcam_screen = createScreenCamMsSimple(self.screen_o_cam_t, self.screen_o_cam_r)
+        ### Rotation matrix — use the transforms already computed by setup_specs
         self.VRhead_cam = np.array(self.hpe[0:3])
         self.VThead_cam = np.array(self.hpe[3:6])
-        self.Mhead_cam, self.Mcam_head  = createBothRotMat(self.VRhead_cam, self.VThead_cam)
+        self.Mhead_cam, self.Mcam_head = createBothRotMat(self.VRhead_cam, self.VThead_cam)
         
     def axisDefinition(self):
         #head axis
@@ -167,146 +158,89 @@ class Read_gaze_data:
 
         # screen axis
         screenAxis_screen  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
-        self.screenAxis_cam     = transformMhProws(self.Mcam_screen, screenAxis_screen)
+        self.screenAxis_cam     = transformMhProws(self.setup_specs.Mcam_screen, screenAxis_screen)
 
     def screenParametersSetup(self):
-        # Screen and camera setup
-        imageSize = []
-        # if self.crop_format:
-        #     self.screen_mm = np.array([self.data["enviroment_variables"]["screen_mm"]["height"], self.data["enviroment_variables"]["screen_mm"]["width"]]    )
-        #     self.screen_pixels = np.array([self.data["enviroment_variables"]["screen_pixels"]["height"], self.data["enviroment_variables"]["screen_pixels"]["width"]])
-        #     self.zoom = self.data["enviroment_variables"]["screen_zoom"]
-        #     self.pos = [int(x*y*self.zoom) for x, y in zip(self.data["percentLookAtPoint"], self.screen_pixels)]
-        #     self.screen_orientation = self.data["enviroment_variables"]["screen_orientation"]
-        #     self.img_res = self.data["enviroment_variables"]["image_resolution"]
-        #     self.screenWmm = self.screen_mm[0]
-        #     self.screenHmm = self.screen_mm[1]
-        #     self.screenWpx = self.screen_pixels[0]
-        #     self.screenHpx = self.screen_pixels[1]
-        #     self.height = self.img_res[0]
-        #     self.width = self.img_res[1]
-        #     self.camera_pos_x, self.camera_pos_y, self.camera_pos_z = self.data["enviroment_variables"]["posCam_mm"]
-        #     self.screen_o_cam_r = np.array([0, math.pi, 0])
-            
-        # elif "enviroment_variables" in self.data:
-        #     self.screen_mm = np.array([self.data["enviroment_variables"]["screen_mm"]["height"], self.data["enviroment_variables"]["screen_mm"]["width"]]    )
-        #     self.screenWmm = self.data["enviroment_variables"]["screen_mm"]["width"]
-        #     self.screenHmm = self.data["enviroment_variables"]["screen_mm"]["height"]
-        #     self.zoom = self.data["enviroment_variables"]["screen_zoom"]
-        #     self.screen_orientation = self.data["enviroment_variables"]["screen_orientation"]
-        #     self.screenWpx = self.data["enviroment_variables"]["screen_pixels"]["width"]
-        #     self.screenHpx = self.data["enviroment_variables"]["screen_pixels"]["height"]
-        #     self.height = self.data["enviroment_variables"]["img_res"]["height"]
-        #     self.width = self.data["enviroment_variables"]["image_resolution"]["width"]
-        #     self.camera_pos_x, self.camera_pos_y, self.camera_pos_z = np.array([(self.data["enviroment_variables"]["posCam_mm"]["x"]), 
-        #                                     self.data["enviroment_variables"]["posCam_mm"]["y"], 
-        #                                     self.data["enviroment_variables"]["posCam_mm"]["z"]])
-            
-        #     if ("rotCam" not in self.data["enviroment_variables"] or 
-        #             "x" not in self.data["enviroment_variables"]["rotCam"] or 
-        #             "y" not in self.data["enviroment_variables"]["rotCam"] or 
-        #             "z" not in self.data["enviroment_variables"]["rotCam"]):
-        #         self.screen_o_cam_r = np.array([0, math.pi, 0])
-        #     else:
-        #         self.screen_o_cam_r = np.array([self.data["enviroment_variables"]["rotCam"]["x"], 
-        #                                 self.data["enviroment_variables"]["rotCam"]["y"], 
-        #                                 self.data["enviroment_variables"]["rotCam"]["z"]])
-        # elif ("screen_mm" in self.data and 
-                # "screen_pixels" in self.data and 
-                # "screen_zoom" in self.data and 
-                # "img_res" in self.data and 
-                # "posCam_mm" in self.data):
-        #self.screen_mm = np.array([self.data["screen_mm"]["height"], self.data["screen_mm"]["width"]])
-        #self.screen_pixels = np.array([self.data["screen_pixels"]["height"], self.data["screen_pixels"]["width"]])
-        self.screenWmm = self.data["screen_mm"]["width"]
-        self.screenHmm = self.data["screen_mm"]["height"]
-        #self.zoom = self.data["screen_zoom"]
-        #self.screen_orientation = self.data["screen_orientation"]
-        self.screenWpx = self.data["screen_pixels"]["width"]
-        self.screenHpx = self.data["screen_pixels"]["height"]
-        self.height = self.data["img_res"]["height"]
-        self.width = self.data["img_res"]["width"]
-        self.camera_pos_x, self.camera_pos_y, self.camera_pos_z = np.array([(self.data["posCam_mm"]["x"]), 
-                                        self.data["posCam_mm"]["y"], 
-                                        self.data["posCam_mm"]["z"]])
+        """Build self.setup_specs from JSON data – single source of truth."""
 
-        if "rotCam" not in self.data or "x" not in self.data["rotCam"] or "y" not in self.data["rotCam"] or "z" not in self.data["rotCam"]:
-            self.screen_o_cam_r = np.array([0, pi, 0])
-        # else:
-        #     self.screenWmm = 260
-        #     self.screenHmm = 173
-        #     self.zoom = 2
-        #     self.screenWpx = 1368
-        #     self.screenHpx = 912
-        #     self.height = 1080
-        #     self.width = 1920
-        #     self.screen_orientation = 0
-        #     self.camera_pos_x, self.camera_pos_y, self.camera_pos_z = np.array([self.screenWmm/2, 10, 0])
-        #     self.screen_o_cam_r = np.array([0, math.pi, 0])
+        # --- raw values from JSON ------------------------------------------
+        screen_width_mm  = self.data["screen_mm"]["width"]
+        screen_height_mm = self.data["screen_mm"]["height"]
+        screen_width_px  = self.data["screen_pixels"]["width"]
+        screen_height_px = self.data["screen_pixels"]["height"]
+        img_height       = self.data["img_res"]["height"]
+        img_width        = self.data["img_res"]["width"]
 
-        if self.screen_orientation == 2 or self.screen_orientation == 3:
-            self.screenHpx, self.screenWpx = self.screenWpx, self.screenHpx
-            self.screenHmm, self.screenWmm = self.screenWmm, self.screenHmm
+        cam_x, cam_y, cam_z = (
+            self.data["posCam_mm"]["x"],
+            self.data["posCam_mm"]["y"],
+            self.data["posCam_mm"]["z"],
+        )
 
-        # Set screen parameters
-        # Compute camera_pos_x and camera_pos_y based on orientation
-        
-        if self.screen_orientation == 0:
-            self.camera_pos_x =  self.camera_pos_x + self.screenWmm / 2
-            self.camera_pos_y = -self.camera_pos_y
-        elif self.screen_orientation == 1:
-            self.camera_pos_x = self.camera_pos_x + self.screenWmm / 2
-            self.camera_pos_y = self.camera_pos_y + self.screenHmm
-        elif self.screen_orientation == 2:
-            self.camera_pos_x = -self.camera_pos_y
-            self.camera_pos_y = -self.camera_pos_x + self.screenHmm / 2
-        elif self.screen_orientation == 3:
-            self.camera_pos_x = self.camera_pos_y + self.screenWmm
-            self.camera_pos_y = self.camera_pos_x + self.screenHmm / 2
+        if ("rotCam" in self.data
+                and "x" in self.data["rotCam"]
+                and "y" in self.data["rotCam"]
+                and "z" in self.data["rotCam"]):
+            cam_rx = self.data["rotCam"]["x"]
+            cam_ry = self.data["rotCam"]["y"]
+            cam_rz = self.data["rotCam"]["z"]
         else:
-            self.camera_pos_x =  self.camera_pos_x + self.screenWmm / 2
-            self.camera_pos_y = -self.camera_pos_y
-        
-        #self.screen_o_cam_r = np.array([self.data["rotCam"]["x"], self.data["rotCam"]["y"], self.data["rotCam"]["z"]])
+            cam_rx, cam_ry, cam_rz = 0.0, pi, 0.0
 
-        self.screen_o_cam_t = np.array([self.camera_pos_x, self.camera_pos_y, self.camera_pos_z])  # Convert to cm
-        self.screenO_px_cam = np.array([self.screen_o_cam_t[0] * self.screenWpx / self.screenWmm, self.screen_o_cam_t[1] * self.screenHpx / self.screenHmm])
+        # --- build Setup_specs (handles orientation + zoom internally) ------
+        self.setup_specs = Setup_specs(
+            screen_width_px=screen_width_px,
+            screen_height_px=screen_height_px,
+            screen_width_mm=screen_width_mm,
+            screen_height_mm=screen_height_mm,
+            screen_orientation=self.screen_orientation,
+            zoom=self.zoom,
+            img_width=img_width,
+            img_height=img_height,
+        )
+
+        # Apply the orientation-dependent camera position tweaks
+        self.setup_specs.update_webcam_params(
+            camera_pos_x=cam_x,
+            camera_pos_y=cam_y,
+            camera_pos_z=cam_z,
+            camera_rot_x=cam_rx,
+            camera_rot_y=cam_ry,
+            camera_rot_z=cam_rz,
+        )
 
     def screenSetup(self):
-        screenFrame_screen = np.array([[0, 0, 0], [self.screenWmm, 0, 0], [self.screenWmm, self.screenHmm, 0], [0, self.screenHmm, 0]])
-        self.screenFrame_cam    = transformMhProws(self.Mcam_screen, screenFrame_screen)
-        self.screen = Screen(self.screenWmm, self.screenHmm, self.screenWpx, self.screenHpx, self.zoom)
-        self.setup_specs = Setup_specs(screen_width_px=self.screenWpx, screen_height_px=self.screenHpx, 
-                                screen_width_mm=self.screenWmm, screen_height_mm=self.screenHmm, 
-                                screen_orientation=self.screen_orientation, 
-                                camera_pos_x=0, camera_pos_y=10, camera_pos_z=0, 
-                                camera_rot_x=0, camera_rot_y=pi, camera_rot_z=0, 
-                                zoom=self.zoom)
+        self.screenFrame_cam = transformMhProws(
+            self.setup_specs.Mcam_screen,
+            self.setup_specs.screen_frame_screen,
+        )
 
     def headSetup(self):
         # Head model
         head3D_head = load_head_model()*10
         self.head3D_cam = transformMhProws(self.Mhead_cam, head3D_head)
 
-        # Eyes centers 3D
-        rightOut_cam = self.head3D_cam[36]
-        rightIn_cam  = self.head3D_cam[39]
-        leftOut_cam  = self.head3D_cam[45]
-        leftIn_cam   = self.head3D_cam[42]
-        self.rightEye3DCenter_cam    = 0.5 * (rightOut_cam + rightIn_cam)
-        self.leftEye3DCenter_cam     = 0.5 * (leftOut_cam + leftIn_cam)
+        # # Eyes centers 3D
+        # rightOut_cam = self.head3D_cam[36]
+        # rightIn_cam  = self.head3D_cam[39]
+        # leftOut_cam  = self.head3D_cam[45]
+        # leftIn_cam   = self.head3D_cam[42]
+        # self.rightEye3DCenter_cam    = 0.5 * (rightOut_cam + rightIn_cam)
+        # self.leftEye3DCenter_cam     = 0.5 * (leftOut_cam + leftIn_cam)
 
-        # Head projection
-        projeMat = computeCameraMatrix((self.height, self.height), (0.5*self.height, 0.5*self.width))
-        head2D_cam   = projectPoints(projeMat, self.head3D_cam)
-        rightOut2D_cam = head2D_cam[36]
-        rightIn2D_cam  = head2D_cam[39]
-        leftOut2D_cam  = head2D_cam[45]
-        leftIn2D_cam   = head2D_cam[42]
-        self.rightVector2D_cam = rightIn2D_cam - rightOut2D_cam
-        self.leftVector2D_cam  = leftOut2D_cam - leftIn2D_cam
-        self.rightCenter2D_cam = 0.5 * (rightOut2D_cam + rightIn2D_cam)
-        self.leftCenter2D_cam = 0.5 * (leftOut2D_cam + leftIn2D_cam)
+        # # Head projection
+        # h = self.setup_specs.img_height
+        # w = self.setup_specs.img_width
+        # projeMat = computeCameraMatrix((h, h), (0.5 * h, 0.5 * w))
+        # head2D_cam   = projectPoints(projeMat, self.head3D_cam)
+        # rightOut2D_cam = head2D_cam[36]
+        # rightIn2D_cam  = head2D_cam[39]
+        # leftOut2D_cam  = head2D_cam[45]
+        # leftIn2D_cam   = head2D_cam[42]
+        # self.rightVector2D_cam = rightIn2D_cam - rightOut2D_cam
+        # self.leftVector2D_cam  = leftOut2D_cam - leftIn2D_cam
+        # self.rightCenter2D_cam = 0.5 * (rightOut2D_cam + rightIn2D_cam)
+        # self.leftCenter2D_cam = 0.5 * (leftOut2D_cam + leftIn2D_cam)
 
     def addHeadPrediction(self, predictionHead3D_cam, predictionMhead_cam, predictionVRhead_cam, predictionVThead_cam):
         predHeadAxis_head  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
@@ -330,15 +264,14 @@ class Read_gaze_data:
         )
 
     def calc_pog_from_gaze_vec(self, eye_gaze_vector_cam, eye_center_3d_cam):
-        #Raw pog calc in the screen
-        R_old_new = self.setup_specs.Mcam_screen[:3, :3]
-        eye_gaze_vector_screen = R_old_new.T @ eye_gaze_vector_cam 
+        """Compute PoG in both mm (cam frame) and px (screen frame)."""
+        R_rot = self.setup_specs.Mcam_screen[:3, :3]
+        eye_gaze_vector_screen = R_rot.T @ eye_gaze_vector_cam
         eye_center_3d_screen = transformMhProws(self.setup_specs.Mscreen_cam, eye_center_3d_cam)
         pog_cm_screen = pog_calc(eye_gaze_vector_screen, eye_center_3d_screen)
         pog_cm_cam = transformMhProws(self.setup_specs.Mcam_screen, pog_cm_screen)
         pog_px = pog_converter_from_cm_2_px(pog_cm_screen, self.setup_specs)
-        
-        return  pog_cm_cam, pog_px
+        return pog_cm_cam, pog_px
 
     @staticmethod
     def __convert_head_format(predictionHead3D_cam: np.ndarray):
@@ -348,10 +281,10 @@ class Read_gaze_data:
         return head_3D
 
     def addGazePrediction(self, gazePrediction):        
-        self.eye3DPredictionCenter_cam = self.data["gaze"]["origin"]
+        self.eye3DPredictionCenter_cam = np.array(self.data["gaze"]["origin"])
         self.gazePrediction = gazePrediction
 
-        self.pogPrediction_cm, self.pogPredictionPx_screen = self.calc_pog_from_gaze_vec(self.gazePrediction, self.eye3DPredictionCenter_cam)
+        self.pogPrediction_cam, self.pogPredictionPx_screen = self.calc_pog_from_gaze_vec(self.gazePrediction, self.eye3DPredictionCenter_cam)
 
         
         vec_rot_error, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.gaze, self.gazePrediction, error_per_component=True)
@@ -360,14 +293,6 @@ class Read_gaze_data:
                 vec_rot_error, x_rot, y_rot, self.gaze, self.gazePrediction
             )
         )
-
-        # eye3d_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.eye3DCenter_cam, self.eye3DPredictionCenter_cam)
-
-        # print(
-        #     "eye3d_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, eye3d gt: {}, eye3d pred: {}".format(
-        #         eye3d_error, x_error, y_error, z_error, self.eye3DCenter_cam, self.eye3DPredictionCenter_cam
-        #     )
-        # )
 
         # Pogcm_cam
         
@@ -379,54 +304,15 @@ class Read_gaze_data:
             )
         )
 
-        pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.pogPrediction_cm, self.pogPrediction_cam)
+        pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.pog_cm_cam, self.pogPrediction_cam)
 
         print(
             "pogMM_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, pogMM gt: {}, pogMM pred: {}".format(
-                pogMM_error, x_error, y_error, z_error, self.pogPrediction_cm, self.pogPrediction_cam
+                pogMM_error, x_error, y_error, z_error, self.pog_cm_cam, self.pogPrediction_cam
             )
         )
 
-    # def addGazePrediction(self, gazePrediction_cam: np.ndarray, eye3DPredictionCenter_cam: np.ndarray, pogPredictionRawPx_screen: np.ndarray, pogPredictionPx_screen: np.ndarray, pog_cm_cam: np.ndarray):        
-    #     self.eye3DPredictionCenter_cam = eye3DPredictionCenter_cam
-    #     self.gazePrediction = gazePrediction_cam
-    #     self.pogPrediction_cam = pog_cm_cam
 
-        
-    #     vec_rot_error, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.gaze, self.gazePrediction, error_per_component=True)
-    #     print(
-    #         "gaze_error:  {:.2f}, x_error: {:.2f}, y_error: {:.2f}, gaze gt: {}, gaze pred: {}".format(
-    #             vec_rot_error, x_rot, y_rot, self.gaze, self.gazePrediction
-    #         )
-    #     )
-
-    #     eye3d_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(self.eye3DCenter_cam, self.eye3DPredictionCenter_cam)
-
-    #     print(
-    #         "eye3d_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, eye3d gt: {}, eye3d pred: {}".format(
-    #             eye3d_error, x_error, y_error, z_error, self.eye3DCenter_cam, self.eye3DPredictionCenter_cam
-    #         )
-    #     )
-
-    #     # Pogcm_cam
-    #     self.pogPredictionPx_screen = pogPredictionPx_screen
-    #     self.pogPredictionRawPx_screen = pogPredictionRawPx_screen
-        
-    #     pogPX_error, [x_error, y_error] = Read_gaze_data.__calc_dist_error(self.pogPx_screen, self.pogPredictionPx_screen)
-
-    #     print(
-    #         "pogPX_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, pogPX gt: {}, pogPX pred: {}".format(
-    #             pogPX_error, x_error, y_error, self.pogPx_screen, self.pogPredictionPx_screen
-    #         )
-    #     )
-
-    #     pogMM_error, [x_error, y_error, z_error] = Read_gaze_data.__calc_dist_error(pog_cm_cam, self.pogPrediction_cam)
-
-    #     print(
-    #         "pogMM_error: {:.2f}, x_error: {:.2f}, y_error: {:.2f}, z_error: {:.2f}, pogMM gt: {}, pogMM pred: {}".format(
-    #             pogMM_error, x_error, y_error, z_error, pog_cm_cam, self.pogPrediction_cam
-    #         )
-    #     )
 
     def plot3D(self):
         #Cam coordinate system
@@ -466,25 +352,22 @@ class Read_gaze_data:
 
         example.plot()
 
-    def plot2D(self, write = False):
-        example2D = trackingScreen2DPlotter(self.screenWpx, self.screenHpx, zoom = self.zoom)
+    def plot2D(self, write=False):
+        ss = self.setup_specs
+        example2D = trackingScreen2DPlotter(ss.screen_width_px, ss.screen_height_px, zoom=ss.zoom)
         example2D.appendCircle(point=self.pogPx_screen, radius=30, color=(255, 20, 255))
 
         if self.pogPredictionRawPx_screen.size > 0:
             example2D.appendPoint(self.pogPredictionPx_screen, (20, 255, 255))
             example2D.appendPoint(self.pogPredictionRawPx_screen, (255, 255, 20))
-        
-        self.screenO_px_cam = np.array([self.screenO_px_cam[0], self.screenO_px_cam[1]])
 
-        # if self.crop_format:
-        #     example2D.appendPoint(self.pogPredictionRawPx_screen, (255, 255, 20))
-        example2D.appendCamera(self.screenO_px_cam, (255, 20, 20))
+        example2D.appendCamera(ss.camera_pos_px, (255, 20, 20))
 
         fig = example2D.plot()
 
         if write:
             cv2.imwrite("img_2d.png", fig)
-        else:       
+        else:
             imgplot = plt.imshow(fig)
             plt.show()
     
@@ -504,13 +387,13 @@ class Read_gaze_data:
             return vec_rot
         
     @staticmethod
-    def __calc_dist_error(point1, point2, abs = False):
+    def __calc_dist_error(point1, point2, use_abs=False):
         # Ensure both points are 3-dimensional
         if len(point1) > 3 or len(point2) > 3:
             raise ValueError("Both points must be 3-dimensional")
         
         # Calculate dimension-wise errors
-        if abs:
+        if use_abs:
             dimension_errors = [abs(point1[i] - point2[i]) for i in range(len(point1))]
         else:
             dimension_errors = [(point1[i] - point2[i]) for i in range(len(point1))]

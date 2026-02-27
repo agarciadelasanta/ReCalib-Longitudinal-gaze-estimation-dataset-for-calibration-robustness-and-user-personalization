@@ -41,7 +41,7 @@ est = ETHXGazeEstimator(
     ckpt_path="./ckpt/epoch_24_ckpt.pth.tar",
     camera_npz_path="./example/input/intrinsicos_surface.npz",
     camera_xml_path=None,
-    device="cuda",
+    device="auto",
 )
 
 if validPair:
@@ -54,11 +54,12 @@ if validPair:
     pog_cm_cam = irisbondPatchJsonReader.pog_cm_cam
 
     gazePrediction = est.predict_gaze_vector(auxFileName)
-
     irisbondPatchJsonReader.addGazePrediction(gazePrediction)
-                                                
+    
     irisbondPatchJsonReader.plot3D()
     irisbondPatchJsonReader.plot2D()
     input("Press Enter to continue...")
     #irisbondPatchJsonReader.plot2D()
+else:
+    print("Invalid pair")
     

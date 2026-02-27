@@ -27,8 +27,8 @@ def showFacePoints(Pts, imageSize):
 class trackingScreen2DPlotter():
     def __init__(self, screenWpx, screenHpx, zoom, orientation=0) -> None:
         self.zoom = zoom
-        self.screenWpx = int(screenWpx * self.zoom)
-        self.screenHpx = int(screenHpx * self.zoom)
+        self.screenWpx = int(screenWpx)
+        self.screenHpx = int(screenHpx)
 
         self.desfase = (int(self.screenWpx/2), int(self.screenHpx/2) )
 
