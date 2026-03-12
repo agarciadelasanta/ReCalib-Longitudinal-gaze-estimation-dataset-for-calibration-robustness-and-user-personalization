@@ -4,7 +4,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
-
+temp/
 *.tar
 *.csv
 *.pyc

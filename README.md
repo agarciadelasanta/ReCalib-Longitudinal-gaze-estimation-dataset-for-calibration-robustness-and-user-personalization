@@ -22,12 +22,12 @@ To ensure compatibility with the provided scripts, organize the downloaded data 
 
 ```text
 ReCalib/
-├── user_00/                      # Unique participant identifier
-│   ├── session_00_00/               # Independent recording session
-│   │   ├── task_00_00_00/  # 9-point calibration task
-│   │   │   ├── 00_00_00_img-0001.jpg    # Frontal RGB image
-│   │   │   └── 00_00_00_img-0001.json   # Per-sample annotation file
-│   │   └── task_00_00_01/        # 16-point test task
+├── user_00/                            # Unique participant identifier
+│   ├── session_00_00/                  # Independent recording session
+│   │   ├── task_00_00_00/              # 9-point calibration task
+│   │   │   ├── 00_00_00_img-0001.jpg   # Frontal RGB image
+│   │   │   └── 00_00_00_img-0001.json  # Per-sample annotation file
+│   │   └── task_00_00_01/              # 16-point test task
 │   │       ├── 00_00_01_img-0001.jpg
 │   │       └── 00_00_01_img-0001.json
 │   │   └── task_00_00_02/
@@ -35,7 +35,7 @@ ReCalib/
 ├── user_01/                      
 │   ├── session_01_00/                
 ...
-└── recalib_index.csv             # Companion index listing all samples and metadata
+└── recalib_index.csv                   # Companion index listing all samples and metadata
 ```
 
 ---
@@ -76,6 +76,52 @@ python visualization/visualize_sample.py --image_path path/to/frame.jpg
 
 ---
 
+## ⚖️ Evaluation Framework
+
+The `evaluation/` directory contains the core pipeline for training and benchmarking gaze estimation models on ReCalib. This framework is designed to handle data normalization and the specific evaluation protocols (e.g., cross-user, session-calibration) defined in the paper.
+
+### Baseline Model
+Our evaluation scripts are built to interface with the **ETH-XGaze** architecture. [cite_start]We utilize the officially released model as a reproducible reference point for our benchmarks[cite: 433, 511].
+* **Official Repository:** [xucong-zhang/ETH-XGaze](https://github.com/xucong-zhang/ETH-XGaze)
+* **Reference:** Zhang et al., "ETH-XGaze: A Large Scale Dataset for Gaze Estimation Under Extreme Head Pose and Gaze Variation," ECCV 2020.
+
+### Scripts Overview
+
+1. **`data_preparation.py`**
+   Handles the transformation of raw dataset samples into model-ready formats.
+    * **Target Selection:** Filters samples based on the intended usage scenario (e.g., selecting only the 9-point calibration tasks for adaptation or the 16-point tasks for testing).
+    * **Normalization:** Implements data normalization from ETH-xGaze repository.
+
+
+
+2. **`train.py`**
+   The primary script for model training and fine-tuning.
+   * Includes configuration for the ETH-XGaze baseline model as a starting point.
+   * Manages hyperparameter logging and model checkpointing.
+
+3. **`eval.py`**
+   Used to quantify performance after training or adaptation.
+   * **Metric Calculation:** Computes the angular gaze error (in degrees) between the predicted vector and the ground truth `gaze.vector`.
+
+### Execution Workflow
+
+To run a standard evaluation cycle, follow this sequence:
+
+```bash
+# 1. Prepare and normalize a specific user subset
+python evaluation/data_preparation.py --user 00 --scenario session-calibration
+
+# 2. Fine-tune the baseline model
+python evaluation/train.py --config configs/personalization.yaml
+
+# 3. Evaluate the results
+python evaluation/eval.py --model_path checkpoints/best_model.pth
+
+```
+
+
+---
+
 ## 🧠 Usage Notes & Evaluation Scenarios
 
 ReCalib is specifically designed to support multiple levels of adaptation research. Its hierarchical organization (User > Session > Task) allows for the definition of rigorous evaluation protocols that mimic real-world HCI and AAC (Augmentative and Alternative Communication) deployments.
@@ -93,7 +139,7 @@ ReCalib is specifically designed to support multiple levels of adaptation resear
 
 4. **Session-Level Calibration**
    The most realistic scenario for AAC systems: 
-   * **Train/Adapt:** Use only the 9-point calibration task at the start of a session.
+   * **Train:** Use only the 9-point calibration task at the start of a session.
    * **Evaluate:** Test on the 16-point tasks that followed in that same session.
 
 ### ⚠️ Data Leakage Prevention
