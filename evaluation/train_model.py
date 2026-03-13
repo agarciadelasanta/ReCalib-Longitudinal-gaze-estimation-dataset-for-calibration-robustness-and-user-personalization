@@ -33,14 +33,14 @@ class TrainingConfig:
         self.use_amp = True
         self.resume_ckpt = kwargs.get("resume_ckpt", None)
 
-def get_logic_indices(target_user, target_session=None, is_calibration=False):
+def get_logic_indices(target_user, target_session=None, session_calibration=False):
     """Filters the H5 metadata to find indices for your 3 core requirements."""
     with h5py.File(H5_PATH, 'r') as h5:
         users = h5['meta/user'][:].astype(str)
         sessions = h5['meta/session'][:].astype(str)
         tasks = h5['meta/task'][:].astype(str)
         
-        if is_calibration:
+        if session_calibration:
             train_idx = np.where((users == target_user) & 
                            (sessions == target_session) & 
                            (tasks == "00"))[0]
@@ -103,7 +103,7 @@ def main():
     CONFIG_VARS = {
         "target_user": "01",
         "target_session": "00",  # Set to None for Leave-One-User-Out
-        "is_calibrate": True,  # Set to True for calibration-only subset
+        "session_calibration": True,  # Set to True for calibration-only subset
         "batch_size": 32,
         "epochs": 2,
         "ckpt_dir": "./checkpoints",
@@ -113,11 +113,11 @@ def main():
     train_idx, test_idx = get_logic_indices(
         CONFIG_VARS["target_user"], 
         CONFIG_VARS["target_session"], 
-        CONFIG_VARS["is_calibrate"]
+        CONFIG_VARS["session_calibration"]
     )
 
     # 2. Split for Validation (No Leakage)
-    if not CONFIG_VARS["is_calibrate"]:
+    if not CONFIG_VARS["session_calibration"]:
         final_train_idx, val_idx = split_train_val_no_leakage(train_idx, split_by='user')
     else:
         final_train_idx, val_idx = split_train_val(train_idx, val_size=0.15, seed=42)

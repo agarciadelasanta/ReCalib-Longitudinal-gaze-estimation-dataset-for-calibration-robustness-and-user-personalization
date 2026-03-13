@@ -31,7 +31,7 @@ def get_random_png(folder_path):
         return None
 
 
-auxFileName = "./example/input/01_01_01_img-001.png"
+auxFileName = "./example/01_01_01_img-001.png"
 
 validPair, auxFilePngName, auxFileJsonName = checkIfisAValidPNGPair(auxFileName)
 

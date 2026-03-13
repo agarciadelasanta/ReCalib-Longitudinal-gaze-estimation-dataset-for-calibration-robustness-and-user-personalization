@@ -218,10 +218,10 @@ if __name__ == "__main__":
         shape_predictor_path="./evaluation/modules/shape_predictor_68_face_landmarks.dat",
         face_model_path="./visualization/face_model.txt",
         ckpt_path="./evaluation/ckpt/epoch_24_ckpt.pth.tar",
-        camera_npz_path="./example/input/intrinsicos_surface.npz",
+        camera_npz_path="./docs/camera_intrinsics.npz",
         camera_xml_path=None,
         device="cpu",
     )
-    auxFileName = "./example/input/01_01_01_img-001.png"
+    auxFileName = "./example/01_01_01_img-001.png"
     v = est.predict_gaze_vector(auxFileName)
     print("Gaze vector:", v)
