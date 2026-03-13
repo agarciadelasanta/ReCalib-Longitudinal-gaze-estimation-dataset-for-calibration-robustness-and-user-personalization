@@ -5,6 +5,8 @@
 __pycache__/
 
 temp/
+checkpoints/
+
 *.tar
 *.csv
 *.pyc

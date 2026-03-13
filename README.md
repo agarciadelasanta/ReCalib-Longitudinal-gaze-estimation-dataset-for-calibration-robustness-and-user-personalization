@@ -2,7 +2,7 @@
 
 This repository is the official companion to the **ReCalib** dataset paper. ReCalib is a longitudinal eye-tracking dataset designed to facilitate research on **calibration robustness** and **user-specific personalization** in camera-based gaze estimation. Captured using a Microsoft Surface Pro 7+, the dataset includes over 150,000 images from 9 participants across 188 sessions.
 
-Public gaze estimation datasets have largely focused on increasing scale and variability in gaze direction, head pose, illumination, and user appearance to improve cross-user generalization. However, datasets explicitly structured to support calibration analysis and user-specific adaptation remain limited. We present ReCalib, a longitudinal eye-tracking dataset designed to facilitate research on calibration robustness and personalization in camera-based gaze estimation systems. The dataset contains recordings from nine participants acquired across multiple sessions and days under realistic human–computer interaction and assistive communication scenarios. Each session follows a structured protocol consisting of a 9-point calibration task followed by several independent 16-point test tasks, enabling explicit separation between calibration and evaluation both within and across sessions. In total, the dataset includes more than 150,000 frontal RGB images captured using a single acquisition setup. Each sample is annotated with screen target coordinates, head pose estimates, selected facial landmarks, eye-region geometry, and a 3D gaze vector representation expressed in a camera-centered coordinate system. In addition, per-sample quality flags derived from a post-acquisition filtering process are provided to support reproducible data selection. The dataset enables studies on domain adaptation, user personalization, and session-level recalibration in gaze estimation systems. The dataset and accompanying code are publicly available at:
+"Public gaze estimation datasets have largely focused on increasing scale and variability in gaze direction, head pose, illumination, and user appearance to improve cross-user generalization. However, datasets explicitly structured to support calibration analysis and user-specific adaptation remain limited. We present ReCalib, a longitudinal eye-tracking dataset designed to facilitate research on calibration robustness and personalization in camera-based gaze estimation systems. The dataset contains recordings from nine participants acquired across multiple sessions and days under realistic human–computer interaction and assistive communication scenarios. Each session follows a structured protocol consisting of a 9-point calibration task followed by several independent 16-point test tasks, enabling explicit separation between calibration and evaluation both within and across sessions. In total, the dataset includes more than 150,000 frontal RGB images captured using a single acquisition setup. Each sample is annotated with screen target coordinates, head pose estimates, selected facial landmarks, eye-region geometry, and a 3D gaze vector representation expressed in a camera-centered coordinate system. In addition, per-sample quality flags derived from a post-acquisition filtering process are provided to support reproducible data selection. The dataset enables studies on domain adaptation, user personalization, and session-level recalibration in gaze estimation systems."
 
 ---
 
@@ -15,7 +15,7 @@ Public gaze estimation datasets have largely focused on increasing scale and var
 
 ## 📊 Dataset Structure & Access
 
-[cite_start]The **ReCalib** dataset is organized hierarchically to facilitate multi-session and longitudinal analysis[cite: 357]. [cite_start]Each participant is assigned a top-level directory, with data grouped into independent recording sessions conducted on different days[cite: 358, 359].
+The **ReCalib** dataset is organized hierarchically to facilitate multi-session and longitudinal analysisEach participant is assigned a top-level directory, with data grouped into independent recording sessions conducted on different days.
 
 ### Recommended Directory Layout
 To ensure compatibility with the provided scripts, organize the downloaded data as follows:
@@ -42,7 +42,7 @@ ReCalib/
 
 ## 📝 Annotation Format
 
-[cite_start]Each image in the ReCalib dataset is paired with a comprehensive JSON annotation file[cite: 305, 363]. [cite_start]To ensure geometric consistency, all 2D quantities (such as target positions and landmarks) are expressed in **pixels** [cite: 303][cite_start], while all 3D quantities are expressed in **millimeters (mm)** [cite: 304] [cite_start]within a camera-centered coordinate system[cite: 326].
+Each image in the ReCalib dataset is paired with a comprehensive JSON annotation file. To ensure geometric consistency, all 2D quantities (such as target positions and landmarks) are expressed in **pixels**, while all 3D quantities are expressed in **millimeters (mm)** within a camera-centered coordinate system.
 
 ### Key Annotation Fields
 
@@ -81,43 +81,9 @@ python visualization/visualize_sample.py --image_path path/to/frame.jpg
 The `evaluation/` directory contains the core pipeline for training and benchmarking gaze estimation models on ReCalib. This framework is designed to handle data normalization and the specific evaluation protocols (e.g., cross-user, session-calibration) defined in the paper.
 
 ### Baseline Model
-Our evaluation scripts are built to interface with the **ETH-XGaze** architecture. [cite_start]We utilize the officially released model as a reproducible reference point for our benchmarks[cite: 433, 511].
+Our evaluation scripts are built to interface with the **ETH-XGaze** architecture. We utilize the officially released model as a reproducible reference point for our benchmarks.
 * **Official Repository:** [xucong-zhang/ETH-XGaze](https://github.com/xucong-zhang/ETH-XGaze)
 * **Reference:** Zhang et al., "ETH-XGaze: A Large Scale Dataset for Gaze Estimation Under Extreme Head Pose and Gaze Variation," ECCV 2020.
-
-### Scripts Overview
-
-1. **`data_preparation.py`**
-   Handles the transformation of raw dataset samples into model-ready formats.
-    * **Target Selection:** Filters samples based on the intended usage scenario (e.g., selecting only the 9-point calibration tasks for adaptation or the 16-point tasks for testing).
-    * **Normalization:** Implements data normalization from ETH-xGaze repository.
-
-
-
-2. **`train.py`**
-   The primary script for model training and fine-tuning.
-   * Includes configuration for the ETH-XGaze baseline model as a starting point.
-   * Manages hyperparameter logging and model checkpointing.
-
-3. **`eval.py`**
-   Used to quantify performance after training or adaptation.
-   * **Metric Calculation:** Computes the angular gaze error (in degrees) between the predicted vector and the ground truth `gaze.vector`.
-
-### Execution Workflow
-
-To run a standard evaluation cycle, follow this sequence:
-
-```bash
-# 1. Prepare and normalize a specific user subset
-python evaluation/data_preparation.py --user 00 --scenario session-calibration
-
-# 2. Fine-tune the baseline model
-python evaluation/train.py --config configs/personalization.yaml
-
-# 3. Evaluate the results
-python evaluation/eval.py --model_path checkpoints/best_model.pth
-
-```
 
 
 ---
@@ -168,12 +134,40 @@ git clone https://github.com/agarciadelasanta/ReCalib-A-multi-session-gaze-datas
 cd ReCalib
 pip install -r requirements.txt
 ```
+## ⚖️ Evaluation Framework
 
+The `evaluation/` directory contains the core pipeline for preparing data and benchmarking gaze estimation models on ReCalib. This framework follows the normalization procedures established by the **ETH-XGaze** baseline to ensure geometric consistency.
+
+### Scripts Overview
+
+1. **`data_normalization.py`**
+   Converts raw images and JSON annotations into processed HDF5 (`.h5`) files.
+   * **Normalization:** Implements the spatial normalization manifold from the ETH-XGaze repository to cancel out variations in head-to-camera distance and orientation.
+   * **Usage:** Requires the `input_folder` variable to be set to the local path of the ReCalib dataset.
+   * **Output:** Generates compressed HDF5 files containing normalized images, head pose, and 3D gaze vectors.
+
+2. **`train_model.py`**
+   The primary script for model training, fine-tuning, and evaluation. Instead of command-line arguments, this script is configured via an internal `CONFIG_VARS` dictionary to support different adaptation scenarios.
+
+### Configuration & Scenarios
+
+To switch between the evaluation protocols described in the paper (e.g., Cross-User vs. Session-Calibration), modify the `CONFIG_VARS` in `train_model.py`:
+
+```python
+CONFIG_VARS = {
+    "target_user": "01",      # Participant ID for evaluation
+    "target_session": "00",    # Set to None for Cross-User (Leave-One-User-Out) protocols
+    "is_calibrate": True,      # True: uses the 9-point calibration subset; False: uses test subset
+    "batch_size": 32,
+    "epochs": 5,
+    "ckpt_dir": "./checkpoints",
+}
+```
 ---
 
 ## 📜 Citation
 
-[cite_start]If you use the ReCalib dataset, annotations, or code in your research, please cite the following paper[cite: 100, 116]:
+If you use the ReCalib dataset, annotations, or code in your research, please cite the following paper:
 
 ```bibtex
 @article{recalib2026,
@@ -187,9 +181,8 @@ pip install -r requirements.txt
 
 ---
 
-⚖️ License
+## ⚖️ License
 
----
 
 Code: MIT License.
 
@@ -197,8 +190,7 @@ Data: Creative Commons Attribution 4.0 International (CC BY 4.0).
 
 ---
 
-✉️ Contact
+## ✉️ Contact
 
----
 For questions regarding reproducibility or dataset access, please open an issue in this repository or contact the main author directly:
 a.garcia@irisbond.com

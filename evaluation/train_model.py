@@ -4,6 +4,7 @@ import torch
 import h5py
 from torch.utils.data import DataLoader
 from sklearn.model_selection import GroupShuffleSplit, train_test_split
+from pathlib import Path
 
 # Import your provided components
 from trainer import Trainer
@@ -11,7 +12,10 @@ from data_loader_h5 import GazeH5Dataset  # The H5 Dataset class we built
 from utils import angular_error
 
 # --- CONFIGURATION ---
-H5_PATH = r'C:\Projects\recalib\ReCalib-A-multi-session-gaze-dataset-for-calibration-robustness-and-user-adaptation\temp\full_dataset.h5'
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = SCRIPT_DIR.parent
+
+H5_PATH = ROOT_DIR / 'temp' / 'full_dataset.h5'
 
 class TrainingConfig:
     """Configuration object compatible with the Trainer class."""
@@ -48,7 +52,24 @@ def get_logic_indices(target_user, target_session=None, is_calibration=False):
         else:
             test_idx = np.where(users == target_user)[0]
             train_idx = np.where(users != target_user)[0]
+            
             return train_idx, test_idx
+def split_train_val(indices, val_size=0.15, seed=42):
+    """
+    Performs a standard random split. 
+    Images from the same user/session will likely appear in both sets.
+    """
+    print(f"[INFO] Performing random split with leakage (val_size={val_size}).")
+    
+    # train_test_split shuffles the data by default
+    train_idx, val_idx = train_test_split(
+        indices, 
+        test_size=val_size, 
+        random_state=seed, 
+        shuffle=True
+    )
+    
+    return train_idx, val_idx
 
 def split_train_val_no_leakage(indices, split_by='user', val_size=0.15):
     """Splits training indices ensuring no leakage between groups."""
@@ -77,11 +98,11 @@ def main():
     # --- HARDCODE YOUR TARGET HERE ---
     CONFIG_VARS = {
         "target_user": "01",
-        "target_session": "00",  # Set to None for Leave-One-User-Out
-        "is_calibrate": False,
+        "target_session": None,  # Set to None for Leave-One-User-Out
+        "is_calibrate": False,  # Set to True for calibration-only subset
         "batch_size": 32,
-        "epochs": 25,
-        "ckpt_dir": "./checkpoints/user_01_session_00"
+        "epochs": 5,
+        "ckpt_dir": "./checkpoints",
     }
 
     # 1. Logic Filtering
@@ -95,7 +116,9 @@ def main():
     if not CONFIG_VARS["is_calibrate"]:
         final_train_idx, val_idx = split_train_val_no_leakage(train_idx, split_by='user')
     else:
-        final_train_idx, val_idx = train_idx, None
+        final_train_idx, val_idx = split_train_val(train_idx, val_size=0.15, seed=42)
+    
+    print(f"Train samples: {len(final_train_idx)}, Val samples: {len(val_idx) if val_idx is not None else 0}, Test samples: {len(test_idx)}")
 
     # 3. Create Loaders
     train_loader = DataLoader(GazeH5Dataset(H5_PATH, final_train_idx), 
