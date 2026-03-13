@@ -5,6 +5,7 @@ import sys
 from read_gaze_data import Read_gaze_data
 
 from utils import checkIfisAValidPNGPair
+from sample_overlay_plots import overlay_visualization
 
 sys.path.append('evaluation')
 from eth_xGaze_inf import ETHXGazeEstimator
@@ -31,9 +32,10 @@ def get_random_png(folder_path):
         return None
 
 
-auxFileName = "./example/01_01_01_img-001.png"
+auxFileName = "./example/02_00_02_img-040.png"
 
 validPair, auxFilePngName, auxFileJsonName = checkIfisAValidPNGPair(auxFileName)
+
 
 est = ETHXGazeEstimator(
     shape_predictor_path="./evaluation/modules/shape_predictor_68_face_landmarks.dat",
@@ -46,6 +48,7 @@ est = ETHXGazeEstimator(
 
 if validPair:
     print(auxFileName)
+    
     irisbondPatchJsonReader = Read_gaze_data(auxFilePngName, auxFileJsonName)
     irisbondPatchJsonReader.loadSetupSpecs("./docs/setup_config.json")
     irisbondPatchJsonReader.sceneReconstruction()
@@ -55,6 +58,8 @@ if validPair:
 
     gazePrediction = est.predict_gaze_vector(auxFileName)
     irisbondPatchJsonReader.addGazePrediction(gazePrediction)
+    
+    overlay_visualization(auxFileName, auxFileJsonName)
     
     irisbondPatchJsonReader.plot3D()
     irisbondPatchJsonReader.plot2D()

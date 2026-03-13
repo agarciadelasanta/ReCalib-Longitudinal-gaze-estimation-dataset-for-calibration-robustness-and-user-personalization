@@ -222,6 +222,6 @@ if __name__ == "__main__":
         camera_xml_path=None,
         device="cpu",
     )
-    auxFileName = "./example/01_01_01_img-001.png"
+    auxFileName = "./example/02_00_02_img-040.png"
     v = est.predict_gaze_vector(auxFileName)
     print("Gaze vector:", v)
