@@ -3,11 +3,9 @@ import cv2
 import dlib
 import numpy as np
 import torch
-import sys
 from torchvision import transforms
 from imutils import face_utils
 
-sys.path.append('evaluation')
 from model import gaze_network  
 
 
@@ -224,6 +222,6 @@ if __name__ == "__main__":
         camera_xml_path=None,
         device="cpu",
     )
-    auxFileName = "./example/input/sample.png"
+    auxFileName = "./example/input/01_01_01_img-001.png"
     v = est.predict_gaze_vector(auxFileName)
     print("Gaze vector:", v)

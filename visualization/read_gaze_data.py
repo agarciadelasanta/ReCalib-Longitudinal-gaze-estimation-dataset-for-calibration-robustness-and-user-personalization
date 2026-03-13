@@ -33,6 +33,41 @@ class Read_gaze_data:
 
         self.sceneReconstruction()
 
+    def loadSetupSpecs(self, json_path):
+        with open(json_path, 'r') as f:
+            setup_data = json.load(f)
+               
+        # Handle screen parameters - set defaults if not present
+        if "screen_mm" in setup_data:
+            self.screen_mm = np.array([setup_data["screen_mm"]["width"], setup_data["screen_mm"]["height"]])
+        else:
+            self.screen_mm = np.array([1920, 1080])  # default
+        
+        if "screen_pixels" in setup_data:
+            self.screen_pixels = np.array([setup_data["screen_pixels"]["height"], setup_data["screen_pixels"]["width"]])
+        else:
+            self.screen_pixels = np.array([1080, 1920])  # default
+        
+        if "posCam_mm" in setup_data:
+            self.posCam_mm = setup_data["posCam_mm"]
+        else:
+            self.posCam_mm = {"x": 0, "y": 0, "z": 0}  # default
+        
+        if "screen_orientation" in setup_data:
+            self.screen_orientation = setup_data["screen_orientation"]
+        else:
+            self.screen_orientation = 0  # default
+        
+        if "screen_zoom" in setup_data:
+            self.zoom = setup_data["screen_zoom"]
+        else:
+            self.zoom = 1  # default
+        
+        if "img_res" in setup_data:
+            self.img_res = setup_data["img_res"]
+        else:
+            self.img_res = {"height": 1080, "width": 1920}  # default
+
     def checkIfIsParsed(self):
         try:
             with open(self.pathJson, 'r') as j:
@@ -62,28 +97,59 @@ class Read_gaze_data:
         self.pogPrediction_cam = []
         self.eye3DPredictionCenter_cam = []
         self.pogPredictionPx_screen = np.array([])
-        self.pogPredictionRawPx_screen = np.array([])
 
     def loadJSONData(self):
         self.pos = np.array([self.data["pos"]["x"], self.data["pos"]["y"]])
-        self.gaze = np.array(self.data["gaze"])
-        self.screen_mm = np.array([self.data["screen_mm"]["width"], self.data["screen_mm"]["height"]])
-        self.screen_pixels = np.array([self.data["screen_pixels"]["height"], self.data["screen_pixels"]["width"]])
         
-        self.posCam_mm = self.data["posCam_mm"]
+        # Handle new gaze structure
+        if isinstance(self.data["gaze"], dict) and "vector" in self.data["gaze"]:
+            self.gaze = np.array(self.data["gaze"]["vector"])
+            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin"])
+            self.pogMm_cam = np.array(self.data["gaze"]["intersection"])
+        else:
+            self.gaze = np.array(self.data["gaze"])
+            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin"]) if "origin" in self.data["gaze"] else np.array([])
+            self.pogMm_cam = np.array(self.data["gaze"]["intersection"]) if "intersection" in self.data["gaze"] else np.array([])
+        
+        # Handle screen parameters - set defaults if not present
+        if "screen_mm" in self.data:
+            self.screen_mm = np.array([self.data["screen_mm"]["width"], self.data["screen_mm"]["height"]])
+        else:
+            self.screen_mm = np.array([1920, 1080])  # default
+        
+        if "screen_pixels" in self.data:
+            self.screen_pixels = np.array([self.data["screen_pixels"]["height"], self.data["screen_pixels"]["width"]])
+        else:
+            self.screen_pixels = np.array([1080, 1920])  # default
+        
+        if "posCam_mm" in self.data:
+            self.posCam_mm = self.data["posCam_mm"]
+        else:
+            self.posCam_mm = {"x": 0, "y": 0, "z": 0}  # default
+        
         self.hpe = self.data["hpe"]["6d"]
 
-        self.screen_orientation = self.data["screen_orientation"]
-        self.zoom = self.data["screen_zoom"]
-        self.img_res = self.data["img_res"]
-        self.pogMm_cam = np.array(self.data["gaze"]["destiny"])
+        if "screen_orientation" in self.data:
+            self.screen_orientation = self.data["screen_orientation"]
+        else:
+            self.screen_orientation = 0  # default
+        
+        if "screen_zoom" in self.data:
+            self.zoom = self.data["screen_zoom"]
+        else:
+            self.zoom = 1  # default
+        
+        if "img_res" in self.data:
+            self.img_res = self.data["img_res"]
+        else:
+            self.img_res = {"height": 1080, "width": 1920}  # default
 
         if self.hpe[5] < 200:
             self.hpe[3] = self.hpe[3]
             self.hpe[4] = self.hpe[4]
             self.hpe[5] = self.hpe[5]
 
-        self.pogMm_cam = np.array(self.data["gaze"]["destiny"])
+        self.pogMm_cam = np.array(self.data["gaze"]["intersection"])
         self.gaze =  np.array(self.data["gaze"]["vector"])
         self.eye3DCenter_cam =  np.array(self.data["gaze"]["origin"])
 
@@ -102,10 +168,6 @@ class Read_gaze_data:
             self.hpe[3] = self.hpe[3]*10
             self.hpe[4] = self.hpe[4]*10
             self.hpe[5] = self.hpe[5]*10
-
-        if "rotated_crop" in self.data and self.data["rotated_crop"] != None:
-            self.roll = self.data["rotated_crop"]["roll"]
-            self.gaze_raw = self.data["rotated_crop"]["gaze_raw"]
 
         self.eye3DCenter_cam =  np.array(self.data["eye3DCenter"])
         self.leftEye3DCenter_cam =  np.array(self.data["leftEyeCenter"])
@@ -141,6 +203,7 @@ class Read_gaze_data:
         # Pog Px -> Cam (using setup_specs instead of standalone Screen)
         Pogcm_screen = self.setup_specs.from_px_to_cm(self.pogPx_screen)
         self.pog_cm_cam = transformMhProws(self.setup_specs.Mcam_screen, Pogcm_screen)
+        self.pogPredictionPx_screen = pog_converter_from_cm_2_px(self.pogMm_cam, self.setup_specs)
 
     def rotationMatrixGen(self):
         ### Rotation matrix — use the transforms already computed by setup_specs
@@ -163,18 +226,18 @@ class Read_gaze_data:
     def screenParametersSetup(self):
         """Build self.setup_specs from JSON data – single source of truth."""
 
-        # --- raw values from JSON ------------------------------------------
-        screen_width_mm  = self.data["screen_mm"]["width"]
-        screen_height_mm = self.data["screen_mm"]["height"]
-        screen_width_px  = self.data["screen_pixels"]["width"]
-        screen_height_px = self.data["screen_pixels"]["height"]
-        img_height       = self.data["img_res"]["height"]
-        img_width        = self.data["img_res"]["width"]
+        # --- raw values from instance variables (set in loadJSONData) ---
+        screen_width_mm  = self.screen_mm[0]
+        screen_height_mm = self.screen_mm[1]
+        screen_width_px  = self.screen_pixels[1]
+        screen_height_px = self.screen_pixels[0]
+        img_height       = self.img_res["height"]
+        img_width        = self.img_res["width"]
 
         cam_x, cam_y, cam_z = (
-            self.data["posCam_mm"]["x"],
-            self.data["posCam_mm"]["y"],
-            self.data["posCam_mm"]["z"],
+            self.posCam_mm["x"],
+            self.posCam_mm["y"],
+            self.posCam_mm["z"],
         )
 
         if ("rotCam" in self.data
@@ -345,7 +408,6 @@ class Read_gaze_data:
             example.appendCircle(self.pogMm_cam, radius, 'ErrorCalibrated')
         
         if self.crop_format:
-            example.appendInfGaze(self.eye3DCenter_cam, self.gaze_raw, 'InfGaze_raw')
             example.appendInfGaze(self.eye3DCenter_cam, self.gaze_corrected, 'InfGaze_corrected')
             for i, gaze_aux in enumerate(self.gaze_corrected_range):
                 example.appendInfGaze(self.eye3DCenter_cam, gaze_aux, f'InfGaze_corrected_range_{i}')
@@ -357,9 +419,8 @@ class Read_gaze_data:
         example2D = trackingScreen2DPlotter(ss.screen_width_px, ss.screen_height_px, zoom=ss.zoom)
         example2D.appendCircle(point=self.pogPx_screen, radius=30, color=(255, 20, 255))
 
-        if self.pogPredictionRawPx_screen.size > 0:
+        if self.pogPredictionPx_screen.size > 0:
             example2D.appendPoint(self.pogPredictionPx_screen, (20, 255, 255))
-            example2D.appendPoint(self.pogPredictionRawPx_screen, (255, 255, 20))
 
         example2D.appendCamera(ss.camera_pos_px, (255, 20, 20))
 

@@ -1,10 +1,12 @@
 from pathlib import Path
 import os
 import random
-
+import sys
 from read_gaze_data import Read_gaze_data
 
 from utils import checkIfisAValidPNGPair
+
+sys.path.append('evaluation')
 from eth_xGaze_inf import ETHXGazeEstimator
 
 def get_random_png(folder_path):
@@ -29,17 +31,15 @@ def get_random_png(folder_path):
         return None
 
 
-folder_path = R"example\input"
-auxFileName = get_random_png(folder_path)
-auxFileName = r"C:\Projects\ReCalib-A-multi-session-gaze-dataset-for-calibration-robustness-and-user-adaptation\example\input\sample.png"
+auxFileName = "./example/input/01_01_01_img-001.png"
 
 validPair, auxFilePngName, auxFileJsonName = checkIfisAValidPNGPair(auxFileName)
 
 est = ETHXGazeEstimator(
-    shape_predictor_path="./visualization/modules/shape_predictor_68_face_landmarks.dat",
+    shape_predictor_path="./evaluation/modules/shape_predictor_68_face_landmarks.dat",
     face_model_path="./visualization/face_model.txt",
-    ckpt_path="./ckpt/epoch_24_ckpt.pth.tar",
-    camera_npz_path="./example/input/intrinsicos_surface.npz",
+    ckpt_path="./evaluation/ckpt/epoch_24_ckpt.pth.tar",
+    camera_npz_path="./docs/camera_intrinsics.npz",
     camera_xml_path=None,
     device="auto",
 )
@@ -47,7 +47,7 @@ est = ETHXGazeEstimator(
 if validPair:
     print(auxFileName)
     irisbondPatchJsonReader = Read_gaze_data(auxFilePngName, auxFileJsonName)
-
+    irisbondPatchJsonReader.loadSetupSpecs("./docs/setup_config.json")
     irisbondPatchJsonReader.sceneReconstruction()
     eye3DPredictionCenter_cam = irisbondPatchJsonReader.eye3DPredictionCenter_cam
     pogPx_screen = irisbondPatchJsonReader.pogPx_screen
