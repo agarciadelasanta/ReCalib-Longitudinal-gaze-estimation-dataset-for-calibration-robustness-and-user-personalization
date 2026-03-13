@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import torch
 import h5py
+import os
 from torch.utils.data import DataLoader
 from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from pathlib import Path
@@ -104,7 +105,7 @@ def main():
         "target_session": "00",  # Set to None for Leave-One-User-Out
         "is_calibrate": True,  # Set to True for calibration-only subset
         "batch_size": 32,
-        "epochs": 5,
+        "epochs": 2,
         "ckpt_dir": "./checkpoints",
     }
 
@@ -132,7 +133,7 @@ def main():
         val_loader = DataLoader(GazeH5Dataset(H5_PATH, val_idx), 
                                 batch_size=CONFIG_VARS["batch_size"], shuffle=False, num_workers=4)
     
-    test_loader = DataLoader(GazeH5Dataset(H5_PATH, test_idx), 
+    test_loader = DataLoader(GazeH5Dataset(H5_PATH, test_idx, is_load_label=False),  
                              batch_size=CONFIG_VARS["batch_size"], shuffle=False, num_workers=4)
 
     # 4. Initialize Trainer
@@ -149,6 +150,9 @@ def main():
 
     # 5. Start Training
     trainer.train()
+
+    # Set the pre-trained model path to the best checkpoint for testing
+    trainer.pre_trained_model_path = os.path.join(config.ckpt_dir, "best_ckpt.pth.tar")
 
     # 6. Final Evaluation on Test Set (Leave-One-Out set)
     # We swap the trainer's test loader manually for the final score

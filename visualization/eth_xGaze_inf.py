@@ -3,10 +3,12 @@ import cv2
 import dlib
 import numpy as np
 import torch
+import sys
 from torchvision import transforms
 from imutils import face_utils
 
-from model import gaze_network
+sys.path.append('evaluation')
+from model import gaze_network  
 
 
 def estimateHeadPose(landmarks, face_model, camera, distortion, iterate=True):
@@ -91,7 +93,7 @@ class ETHXGazeEstimator:
         shape_predictor_path: str,
         face_model_path: str,
         ckpt_path: str,
-        device: str = "cuda",
+        device: str = "cpu",
         camera_npz_path: str | None = None,
         camera_xml_path: str | None = None,
         use_cnn_detector: bool = False,
@@ -220,7 +222,7 @@ if __name__ == "__main__":
         ckpt_path="./evaluation/ckpt/epoch_24_ckpt.pth.tar",
         camera_npz_path="./example/input/intrinsicos_surface.npz",
         camera_xml_path=None,
-        device="cuda",
+        device="cpu",
     )
     auxFileName = "./example/input/sample.png"
     v = est.predict_gaze_vector(auxFileName)

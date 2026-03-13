@@ -207,7 +207,7 @@ class Trainer:
         save_index = 0
 
         print("Testing on", self.num_test, "samples")
-        for i, (input_img,) in enumerate(self.test_loader):
+        for i, input_img in enumerate(self.test_loader):
             input_var = input_img.float().to(self.device, non_blocking=True)
             pred = self.model(input_var).detach().cpu().numpy()
 
@@ -218,7 +218,7 @@ class Trainer:
         if save_index != self.num_test:
             print("WARNING: saved", save_index, "!= num_test", self.num_test)
 
-        np.savetxt("test_results.txt", pred_gaze_all, delimiter=",")
+        np.savetxt("./temp/test_results.txt", pred_gaze_all, delimiter=",")
 
     def save_checkpoint(self, state, add=None):
         filename = f"{add}_ckpt.pth.tar" if add else "ckpt.pth.tar"
