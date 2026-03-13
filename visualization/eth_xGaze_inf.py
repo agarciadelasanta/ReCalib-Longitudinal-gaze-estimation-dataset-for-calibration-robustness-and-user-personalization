@@ -215,13 +215,13 @@ class ETHXGazeEstimator:
 # ----------------------------
 if __name__ == "__main__":
     est = ETHXGazeEstimator(
-        shape_predictor_path="./visualization/modules/shape_predictor_68_face_landmarks.dat",
+        shape_predictor_path="./evaluation/modules/shape_predictor_68_face_landmarks.dat",
         face_model_path="./visualization/face_model.txt",
-        ckpt_path="./ckpt/epoch_24_ckpt.pth.tar",
+        ckpt_path="./evaluation/ckpt/epoch_24_ckpt.pth.tar",
         camera_npz_path="./example/input/intrinsicos_surface.npz",
         camera_xml_path=None,
         device="cuda",
     )
-    auxFileName = r"C:\Projects\ReCalib-A-multi-session-gaze-dataset-for-calibration-robustness-and-user-adaptation\example\input\sample.png"
+    auxFileName = "./example/input/sample.png"
     v = est.predict_gaze_vector(auxFileName)
     print("Gaze vector:", v)

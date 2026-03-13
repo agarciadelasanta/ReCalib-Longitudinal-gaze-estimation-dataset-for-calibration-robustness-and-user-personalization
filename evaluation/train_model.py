@@ -40,10 +40,13 @@ def get_logic_indices(target_user, target_session=None, is_calibration=False):
         tasks = h5['meta/task'][:].astype(str)
         
         if is_calibration:
-            idx = np.where((users == target_user) & 
+            train_idx = np.where((users == target_user) & 
                            (sessions == target_session) & 
                            (tasks == "00"))[0]
-            return idx, None
+            test_idx = np.where((users == target_user) & 
+                           (sessions == target_session) & 
+                           (tasks != "00"))[0]
+            return train_idx, test_idx
         elif target_session:
             test_idx = np.where((users == target_user) & (sessions == target_session))[0]
             train_idx = np.where((users != target_user) | 
@@ -98,8 +101,8 @@ def main():
     # --- HARDCODE YOUR TARGET HERE ---
     CONFIG_VARS = {
         "target_user": "01",
-        "target_session": None,  # Set to None for Leave-One-User-Out
-        "is_calibrate": False,  # Set to True for calibration-only subset
+        "target_session": "00",  # Set to None for Leave-One-User-Out
+        "is_calibrate": True,  # Set to True for calibration-only subset
         "batch_size": 32,
         "epochs": 5,
         "ckpt_dir": "./checkpoints",
@@ -118,7 +121,7 @@ def main():
     else:
         final_train_idx, val_idx = split_train_val(train_idx, val_size=0.15, seed=42)
     
-    print(f"Train samples: {len(final_train_idx)}, Val samples: {len(val_idx) if val_idx is not None else 0}, Test samples: {len(test_idx)}")
+    print(f"Final Train Samples: {len(final_train_idx)}, Val Samples: {len(val_idx) if val_idx is not None else 0}, Test Samples: {len(test_idx)}")
 
     # 3. Create Loaders
     train_loader = DataLoader(GazeH5Dataset(H5_PATH, final_train_idx), 
