@@ -98,7 +98,7 @@ This is the main utility for data inspection. It supports both ground-truth visu
 * **Dual-View Inspection**: Generates a 2D image overlay in the screen coordinate system and an interactive 3D visualization of the gaze origin, vector, and head pose.
 * **Label Verification**: Renders all JSON metadata, including facial landmarks, eye ROIs, and 3D gaze rays.
 * **Inference Overlay**: Optionally accepts a path to a trained model from the `evaluation/` section to compare predicted gaze vectors against ground-truth labels.
-* **Input**: Requires the absolute or relative path to a single `.jpg` (or `.png`) sample.
+* **Input**: Requires the absolute or relative path to a single `.png` sample.
 * **Output**: 
     * **Interactive 3D Plot**: A spatial representation of the camera-centered coordinate system.
     * **2D Screen View**: Target and gaze intersection points mapped to the 2D display.
@@ -145,8 +145,8 @@ To maintain the integrity of your results, please follow these rules:
 
 ## 📂 Repository Contents
 This repository provides the tools necessary to parse, visualize, and evaluate the ReCalib dataset:
-* `examples/`: Scripts for loading samples and building dataset indices.
-* `visualization/`: Tools to render 3D gaze vectors and facial landmarks.
+* `examples/`: Sample for visualization/understanding of the dataset.
+* `visualization/`: Core visualization tools for 2D/3D gaze and landmark inspection.
 * `evaluation/`: Scripts for ETH-XGaze baseline fine-tuning and cross-user evaluation.
 * `docs/`: Detailed documentation on the annotation schema and hardware setup.
 
