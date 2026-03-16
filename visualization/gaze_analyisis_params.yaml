@@ -1,0 +1,29 @@
+#alex
+x_axis_hpe_t_lim: [-70, 70]
+y_axis_hpe_t_lim: [-20, 150]
+z_axis_hpe_t_lim: [260, 470]
+
+x_axis_hpe_r_lim: [-0.2, 0.2]
+y_axis_hpe_r_lim: [-0.5, 0.5]
+z_axis_hpe_r_lim: [-0.4, 0.4]
+
+x_axis_ge_lim: [-0.6, 0.6]
+y_axis_ge_lim: [-0.2, 0.6]
+z_axis_ge_lim: [-1.0, -0.4]
+
+# Calibrated intersection (pog_intersect_x/y)
+x_axis_pog_lim: [-150, 150]
+y_axis_pog_lim: [200, 0]
+
+# Fixed-z intersection (pog_intersect_norm_x/y) if you want specific limits
+x_axis_pog_norm_lim: [-25, 25]
+y_axis_pog_norm_lim: [ -10 , 28]
+
+# Optional: error heatmap color scale
+error_vmin: 2
+error_vmax: 10
+
+# Screen and camera parameters
+screen_w: 260
+screen_h: 173
+cam_y: 10

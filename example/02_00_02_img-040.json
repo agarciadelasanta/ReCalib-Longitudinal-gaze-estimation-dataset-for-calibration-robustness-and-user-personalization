@@ -109,30 +109,6 @@
             ]
         }
     },
-    "eye_roi": {
-        "left_eye": {
-            "openEye": true,
-            "2d_inner_point": [
-                922,
-                640
-            ],
-            "2d_outer_point": [
-                1008,
-                625
-            ]
-        },
-        "right_eye": {
-            "openEye": true,
-            "2d_inner_point": [
-                823,
-                650
-            ],
-            "2d_outer_point": [
-                726,
-                652
-            ]
-        }
-    },
     "quality_assurance_metrics": {
         "2D_landmark_info": {
             "max_x": 0.548,

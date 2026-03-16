@@ -26,8 +26,8 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         
         # Draw the index number (ID) next to the point
         # Offset the text slightly so it doesn't sit directly on the dot
-        cv2.putText(img, str(lmk_id), (x + 8, y - 8), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        # cv2.putText(img, str(lmk_id), (x + 8, y - 8), 
+        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
     # --- 2. Identify Midpoint for Gaze Origin using Specific Landmark IDs ---
     # MediaPipe mapping: 362/133 (inner corners), 263/33 (outer corners)
@@ -36,9 +36,9 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         r_inner = landmarks["133"]
         l_outer = landmarks["263"]
         r_outer = landmarks["33"]
+        middle = landmarks["168"]
 
-        start_point = (int((l_inner[0] + r_inner[0]) / 2), 
-                       int((l_inner[1] + r_inner[1]) / 2))
+        start_point = middle
         
         # Highlight selected eye corners for visibility
         for pt in [l_inner, r_inner, l_outer, r_outer]:
@@ -69,6 +69,7 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         f"Session: {data.get('session')}",
         f"Task: {data.get('task')} ({data.get('task_type')})"
     ]
+    
     for i, text in enumerate(meta_text):
         cv2.putText(img, text, (30, 60 + (i * 50)), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
 
