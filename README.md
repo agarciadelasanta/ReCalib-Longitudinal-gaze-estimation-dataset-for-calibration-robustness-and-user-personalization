@@ -50,21 +50,19 @@ Each image in the ReCalib dataset is paired with a comprehensive JSON annotation
 
 The following fields are included in each sample's JSON file to support model training and technical validation:
 
-* **`hpe.6d`**: A 6-dimensional representation of head pose $(r_x, r_y, r_z, t_x, t_y, t_z)$. Rotations are Euler angles in radians, and translations are in millimeters.
-* **`gaze.vector`**: A unit-norm 3D gaze direction vector representing the user's gaze.
-* **`gaze.intersection`**: The 3D intersection point where the gaze ray meets the screen plane, expressed in millimeters.
-* **`gaze.origin`**: The 3D origin of the gaze ray, located between the eyes.
-* **`discard_info`**: Records the specific reason for sample exclusion (e.g., failed face detection, geometrically inconsistent, or closed eyes) if flagged by the quality pipeline.
 * **`pos.x, pos.y`**: The 2D screen target coordinates in pixels, defining the ground truth for the visual stimulus.
+* **`gaze.vector`**: Information regarding the totality of the elements that form the gaze and its points: gaze vector, origina and plane intersection.
+* **`hpe.6d`**: A 6-dimensional representation of head pose $(r_x, r_y, r_z, t_x, t_y, t_z)$. Rotations are Euler angles in radians, and translations are in millimeters.
 * **`hpe.facial_landmarks_2D`**: Selected 2D facial landmarks used by the MediaPipe Face Mesh model.
-* **`eye_roi`**: Inner and outer eye corner coordinates for each eye.
+* **`qulity_assurance_metrics`**: Quality metrics used during the post processing to identify: (i) failed face detection, (ii) geometrically inconsistent head pose estimates, or (iii) closed eyes or insufficient eye visibility.
+* **`discard_info`**: Records the specific reason for sample exclusion (e.g., failed face detection, geometrically inconsistent, or closed eyes) if flagged by the quality pipeline.
 
 ### Metadata & Geometry
 
 While per-sample JSONs contain specific coordinates, global acquisition metadata—such as device specifications, screen dimensions, and camera placement—remain constant across the dataset. Detailed technical specifications for the acquisition environment can be found in the `docs/` folder:
 
 * **`camera_intrinsics.npz`**: Contains the specific camera intrinsic parameters ($f_x, f_y, c_x, c_y$) and distortion coefficients used for geometric gaze mapping.
-* **`setup_config.json`**: Provides the physical setup dimensions, including the spatial relationship between the camera and the display.
+* **`setup_config.json`**: Provides the physical/virtual setup dimensions, including the spatial relationship between the camera and the display.
 
 ---
 
@@ -75,7 +73,7 @@ ReCalib is specifically designed to support multiple levels of adaptation resear
 ### Supported Research Scenarios
 
 1. **Cross-Dataset Transfer**
-   Evaluate a model trained on external datasets (like ETH-XGaze or GazeCapture) directly on ReCalib. This helps quantify the "domain gap" between general gaze datasets and specific tablet-based interaction scenarios.
+   Evaluate a model trained on external datasets directly on ReCalib. This helps quantify the "domain gap" between general gaze datasets and this specific tablet-based interaction scenario.
 
 2. **Cross-User Adaptation**
    Standard participant-independent evaluation. Use a "leave-one-user-out" protocol to ensure the model generalizes to completely unseen facial geometries and appearances.
@@ -85,7 +83,7 @@ ReCalib is specifically designed to support multiple levels of adaptation resear
 
 4. **Session-Level Calibration**
    The most realistic scenario for AAC systems: 
-   * **Train:** Use only the 9-point calibration task at the start of a session.
+   * **Train:** Use the 9-point calibration task at the start of a session.
    * **Evaluate:** Test on the 16-point tasks that followed in that same session.
 
 ### ⚠️ Data Leakage Prevention
@@ -100,7 +98,7 @@ To maintain the integrity of your results, please follow these rules:
 ## 📂 Repository Contents
 This repository provides the tools necessary to parse, visualize, and evaluate the ReCalib dataset:
 * `examples/`: Sample for visualization/understanding of the dataset.
-* `visualization/`: Core visualization tools for 2D/3D gaze and landmark inspection.
+* `visualization/`: Core visualization tools for sample distribution, 2D/3D gaze and landmark inspection.
 * `evaluation/`: Scripts for ETH-XGaze baseline fine-tuning and cross-user evaluation.
 * `docs/`: Detailed documentation on the annotation schema and hardware setup.
 
@@ -176,7 +174,7 @@ To switch between the evaluation protocols described in the paper (e.g., Cross-U
 CONFIG_VARS = {
     "target_user": "01",         # Participant ID for evaluation
     "target_session": "00",      # Set to None for Cross-User (Leave-One-User-Out) protocols
-    "session_calibration": True, # True: uses the 9-point calibration subset; False: uses test subset
+    "session_calibration": True, # True: uses the 9-point calibration subset; False: uses all 4 tasks
     "batch_size": 32,
     "epochs": 5,
     "ckpt_dir": "./checkpoints",
