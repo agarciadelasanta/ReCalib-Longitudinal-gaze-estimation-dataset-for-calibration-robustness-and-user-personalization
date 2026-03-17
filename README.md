@@ -51,11 +51,11 @@ Each image in the ReCalib dataset is paired with a comprehensive JSON annotation
 The following fields are included in each sample's JSON file to support model training and technical validation:
 
 * **`pos.x, pos.y`**: The 2D screen target coordinates in pixels, defining the ground truth for the visual stimulus.
-* **`gaze.vector`**: Information regarding the totality of the elements that form the gaze and its points: gaze vector, origina and plane intersection.
+* **`gaze`**: Information regarding the totality of the elements that form the gaze in 3D space, including the `gaze.vector` (direction), `gaze.origin` (starting point between the eyes), and `gaze.intersection` (point on the screen plane).
 * **`hpe.6d`**: A 6-dimensional representation of head pose $(r_x, r_y, r_z, t_x, t_y, t_z)$. Rotations are Euler angles in radians, and translations are in millimeters.
-* **`hpe.facial_landmarks_2D`**: Selected 2D facial landmarks used by the MediaPipe Face Mesh model.
-* **`qulity_assurance_metrics`**: Quality metrics used during the post processing to identify: (i) failed face detection, (ii) geometrically inconsistent head pose estimates, or (iii) closed eyes or insufficient eye visibility.
-* **`discard_info`**: Records the specific reason for sample exclusion (e.g., failed face detection, geometrically inconsistent, or closed eyes) if flagged by the quality pipeline.
+* **`hpe.facial_landmarks_2D`**: Key 2D facial landmarks used by the MediaPipe Face Mesh model.
+* **`quality_assurance_metrics`**: Raw quality metrics calculated during post-processing used to evaluate face detection confidence, head pose geometric consistency, and eye visibility (e.g., Eye Aspect Ratio for blinks).
+* **`discard_info`**: Records the specific categorical reason for sample exclusion if flagged by the quality pipeline.
 
 ### Metadata & Geometry
 
