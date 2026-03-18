@@ -1,4 +1,4 @@
-# ReCalib: A Multi-Session Gaze Dataset for Calibration Robustness and User Adaptation
+# ReCalib: Longitudinal gaze estimation dataset for calibration robustness and user-specific personalization
 
 This repository is the official companion to the **ReCalib** dataset paper. ReCalib is a longitudinal eye-tracking dataset designed to facilitate research on **calibration robustness** and **user-specific personalization** in camera-based gaze estimation. Captured using a Microsoft Surface Pro 7+, the dataset includes over 150,000 images from 9 participants across 188 sessions.
 
