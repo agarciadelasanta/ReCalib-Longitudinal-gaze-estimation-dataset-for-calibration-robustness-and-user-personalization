@@ -50,12 +50,13 @@ Each image in the ReCalib dataset is paired with a comprehensive JSON annotation
 
 The following fields are included in each sample's JSON file to support model training and technical validation:
 
-* **`pos.x, pos.y`**: The 2D screen target coordinates in pixels, defining the ground truth for the visual stimulus.
-* **`gaze`**: Information regarding the totality of the elements that form the gaze in 3D space, including the `gaze.vector` (direction), `gaze.origin` (starting point between the eyes), and `gaze.intersection` (point on the screen plane).
-* **`hpe.6d`**: A 6-dimensional representation of head pose $(r_x, r_y, r_z, t_x, t_y, t_z)$. Rotations are Euler angles in radians, and translations are in millimeters.
-* **`hpe.facial_landmarks_2D`**: Key 2D facial landmarks used by the MediaPipe Face Mesh model.
-* **`quality_assurance_metrics`**: Raw quality metrics calculated during post-processing used to evaluate face detection confidence, head pose geometric consistency, and eye visibility (e.g., Eye Aspect Ratio for blinks).
-* **`discard_info`**: Records the specific categorical reason for sample exclusion if flagged by the quality pipeline.
+* **`pog_px.x, pog_px.y`**: The 2D screen target coordinates in pixels, defining the ground truth for the visual stimulus.
+* **`gaze`**: Information regarding the totality of the elements that form the gaze in 3D space, including the `gaze.vector` (direction), `gaze.origin_mm` (starting point between the eyes), and `gaze.intersection_mm` (point on the screen plane).
+* **`head_pose.rotation_rad`**: A 3-dimensional representation of head pose rotation as eulder angles in radians $(r_x, r_y, r_z)$.
+* **`head_pose.rotation_rad`**: A 3-dimensional representation of head pose translation in millimeters $(t_x, t_y, t_z)$.
+* **`head_pose.mediapipe_face_mesh_2d`**: Key 2D facial landmarks used by the MediaPipe Face Mesh model. See `docs/mediapipe_face_landmark.png` for a detailed explanation of each landmark index. 
+* **`quality_assurance_metrics`**: Raw quality metrics calculated during post-processing used to evaluate face detection confidence, head pose geometric consistency, and eye visibility.  
+* **`discard_info`**: Records the specific categorical reason for sample exclusion if flagged by the quality pipeline. See `docs/discarding_criteria.py` for an explanation for each discarding criteria category.
 
 ### Metadata & Geometry
 

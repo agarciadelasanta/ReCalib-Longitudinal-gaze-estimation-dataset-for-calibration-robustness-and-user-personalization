@@ -17,7 +17,8 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         data = json.load(f)
 
     # --- 1. Draw 2D Facial Landmarks and Index Numbers ---
-    landmarks = data.get("hpe", {}).get("facial_landmarks_2D", {})
+    # Updated to the new 'head_pose' and 'mediapipe_face_mesh_2d' keys
+    landmarks = data.get("head_pose", {}).get("mediapipe_face_mesh_2d", {})
     for lmk_id, coords in landmarks.items():
         x, y = int(coords[0]), int(coords[1])
         
@@ -26,8 +27,8 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         
         # Draw the index number (ID) next to the point
         # Offset the text slightly so it doesn't sit directly on the dot
-        # cv2.putText(img, str(lmk_id), (x + 8, y - 8), 
-        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(img, str(lmk_id), (x + 8, y - 8), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
     # --- 2. Identify Midpoint for Gaze Origin using Specific Landmark IDs ---
     # MediaPipe mapping: 362/133 (inner corners), 263/33 (outer corners)
@@ -64,10 +65,11 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         cv2.arrowedLine(img, start_point, pred_end, (255, 0, 0), 5, tipLength=0.1)
 
     # --- 4. UI: Metadata (Top Left) ---
+    # Updated identifiers to user_id, session_id, and task_id
     meta_text = [
-        f"User: {data.get('user')}",
-        f"Session: {data.get('session')}",
-        f"Task: {data.get('task')} ({data.get('task_type')})"
+        f"User: {data.get('user_id')}",
+        f"Session: {data.get('session_id')}",
+        f"Task: {data.get('task_id')} ({data.get('task_type')})"
     ]
     
     for i, text in enumerate(meta_text):

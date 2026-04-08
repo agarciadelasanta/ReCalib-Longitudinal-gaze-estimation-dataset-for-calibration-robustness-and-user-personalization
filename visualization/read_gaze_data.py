@@ -74,13 +74,15 @@ class Read_gaze_data:
                 self.data = json.loads(j.read())
         except Exception as e:
             print("Error loading JSON:", e)
+        
         if self.crop_format:
             if "rotation" in self.data:
                 return True
             else:
                 return False
         else:
-            if "hpe" in self.data:
+            # Updated from 'hpe' to 'head_pose'
+            if "head_pose" in self.data:
                 return True
             else:
                 return False
@@ -99,17 +101,18 @@ class Read_gaze_data:
         self.pogPredictionPx_screen = np.array([])
 
     def loadJSONData(self):
-        self.pos = np.array([self.data["pos"]["x"], self.data["pos"]["y"]])
+        # Updated from 'pos' to 'pog'
+        self.pos = np.array([self.data["pog_px"]["x"], self.data["pog_px"]["y"]])
         
-        # Handle new gaze structure
+        # Handle new gaze structure (with _mm suffix)
         if isinstance(self.data["gaze"], dict) and "vector" in self.data["gaze"]:
             self.gaze = np.array(self.data["gaze"]["vector"])
-            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin"])
-            self.pogMm_cam = np.array(self.data["gaze"]["intersection"])
+            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"])
+            self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"])
         else:
             self.gaze = np.array(self.data["gaze"])
-            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin"]) if "origin" in self.data["gaze"] else np.array([])
-            self.pogMm_cam = np.array(self.data["gaze"]["intersection"]) if "intersection" in self.data["gaze"] else np.array([])
+            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"]) if "origin_mm" in self.data["gaze"] else np.array([])
+            self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"]) if "pog_mm" in self.data["gaze"] else np.array([])
         
         # Handle screen parameters - set defaults if not present
         if "screen_mm" in self.data:
@@ -127,7 +130,10 @@ class Read_gaze_data:
         else:
             self.posCam_mm = {"x": 0, "y": 0, "z": 0}  # default
         
-        self.hpe = self.data["hpe"]["6d"]
+        # Reconstruct the 6D HPE array from the new nested rotation/translation lists
+        rot = self.data["head_pose"]["rotation_rad"]
+        trans = self.data["head_pose"]["translation_mm"]
+        self.hpe = rot + trans  # Concatenating two lists into one 6-element list
 
         if "screen_orientation" in self.data:
             self.screen_orientation = self.data["screen_orientation"]
@@ -149,19 +155,14 @@ class Read_gaze_data:
             self.hpe[4] = self.hpe[4]
             self.hpe[5] = self.hpe[5]
 
-        self.pogMm_cam = np.array(self.data["gaze"]["intersection"])
-        self.gaze =  np.array(self.data["gaze"]["vector"])
-        self.eye3DCenter_cam =  np.array(self.data["gaze"]["origin"])
+        # Double assignment fix: updating to the new standard keys
+        self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"])
+        self.gaze = np.array(self.data["gaze"]["vector"])
+        self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"])
 
     def loadJSONData_crop(self):
         self.gaze = np.array(self.data["gaze"])
-        #self.screen_mm = self.data["enviroment_variables"]["screen_mm"]*10
-
-        #self.posCam_mm = [130, 10, 0]
         self.hpe = np.concatenate((self.data["rotation"], self.data["position"]))
-
-        #self.screen_orientation = self.data["enviroment_variables"]["screen_orientation"]
-        #self.img_res = self.data["enviroment_variables"]["image_resolution"]
         self.pogMm_cam = np.array(self.data["lookAtPoint"])
 
         if self.hpe[5] < 200:
@@ -283,28 +284,6 @@ class Read_gaze_data:
         head3D_head = load_head_model()*10
         self.head3D_cam = transformMhProws(self.Mhead_cam, head3D_head)
 
-        # # Eyes centers 3D
-        # rightOut_cam = self.head3D_cam[36]
-        # rightIn_cam  = self.head3D_cam[39]
-        # leftOut_cam  = self.head3D_cam[45]
-        # leftIn_cam   = self.head3D_cam[42]
-        # self.rightEye3DCenter_cam    = 0.5 * (rightOut_cam + rightIn_cam)
-        # self.leftEye3DCenter_cam     = 0.5 * (leftOut_cam + leftIn_cam)
-
-        # # Head projection
-        # h = self.setup_specs.img_height
-        # w = self.setup_specs.img_width
-        # projeMat = computeCameraMatrix((h, h), (0.5 * h, 0.5 * w))
-        # head2D_cam   = projectPoints(projeMat, self.head3D_cam)
-        # rightOut2D_cam = head2D_cam[36]
-        # rightIn2D_cam  = head2D_cam[39]
-        # leftOut2D_cam  = head2D_cam[45]
-        # leftIn2D_cam   = head2D_cam[42]
-        # self.rightVector2D_cam = rightIn2D_cam - rightOut2D_cam
-        # self.leftVector2D_cam  = leftOut2D_cam - leftIn2D_cam
-        # self.rightCenter2D_cam = 0.5 * (rightOut2D_cam + rightIn2D_cam)
-        # self.leftCenter2D_cam = 0.5 * (leftOut2D_cam + leftIn2D_cam)
-
     def addHeadPrediction(self, predictionHead3D_cam, predictionMhead_cam, predictionVRhead_cam, predictionVThead_cam):
         predHeadAxis_head  = 50*np.array([[0,0,0], [1,0,0], [0,1,0], [0,0,1]])
         self.predHeadAxis_cam  = transformMhProws(predictionMhead_cam, predHeadAxis_head)
@@ -338,18 +317,15 @@ class Read_gaze_data:
 
     @staticmethod
     def __convert_head_format(predictionHead3D_cam: np.ndarray):
-
         head_3D = np.array([np.array([-headAux.x, headAux.y, headAux.z]) for headAux in predictionHead3D_cam])
-
         return head_3D
 
     def addGazePrediction(self, gazePrediction):        
-        self.eye3DPredictionCenter_cam = np.array(self.data["gaze"]["origin"])
+        self.eye3DPredictionCenter_cam = np.array(self.data["gaze"]["origin_mm"]) # Updated _mm
         self.gazePrediction = gazePrediction
 
         self.pogPrediction_cam, self.pogPredictionPx_screen = self.calc_pog_from_gaze_vec(self.gazePrediction, self.eye3DPredictionCenter_cam)
 
-        
         vec_rot_error, x_rot, y_rot = Read_gaze_data.__calc_vec_and_xy_angles_error(self.gaze, self.gazePrediction, error_per_component=True)
         print(
             "gaze_error:  {:.2f}, x_error: {:.2f}, y_error: {:.2f}, gaze gt: {}, gaze pred: {}".format(
@@ -357,8 +333,6 @@ class Read_gaze_data:
             )
         )
 
-        # Pogcm_cam
-        
         pogPX_error, [x_error, y_error] = Read_gaze_data.__calc_dist_error(self.pogPx_screen, self.pogPredictionPx_screen)
 
         print(
@@ -374,8 +348,6 @@ class Read_gaze_data:
                 pogMM_error, x_error, y_error, z_error, self.pog_cm_cam, self.pogPrediction_cam
             )
         )
-
-
 
     def plot3D(self):
         #Cam coordinate system
@@ -432,7 +404,6 @@ class Read_gaze_data:
             imgplot = plt.imshow(fig)
             plt.show()
     
-
     @staticmethod
     def __calc_vec_and_xy_angles_error(vector1, vector2, error_per_component=False):
         vector1 = vector1 / np.linalg.norm(vector1)
