@@ -156,7 +156,8 @@ class ETHXGazeEstimator:
 
         # gaze model
         if not os.path.isfile(ckpt_path):
-            raise FileNotFoundError(f"checkpoint not found: {ckpt_path}")
+            print(f"Pretrained model could not be found, please make sure you followed the instructions in evaluation/ckpt/README.txt")
+            exit()
         self.model = gaze_network().to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         self.model.load_state_dict(ckpt["model_state"], strict=True)
