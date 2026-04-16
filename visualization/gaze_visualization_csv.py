@@ -16,7 +16,7 @@ import numpy.ma as ma
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Rectangle, Patch
 import seaborn as sns
-
+import re 
 # ============================================================
 # ------------------ PARAMS ----------------------------------
 # ============================================================
@@ -229,7 +229,8 @@ def save_all_figures(export_dir: str):
     for i in plt.get_fignums():
         fig = plt.figure(i)
         title = fig._suptitle.get_text() if fig._suptitle else (fig.get_axes()[0].get_title() if fig.get_axes() else f"figure_{i}")
-        filepath = os.path.join(export_dir, f"{re.sub(r'[-\s]+', '_', re.sub(r'[^\w\s-]', '', title).strip().lower())}.png")
+        clean_title = re.sub(r'[-\s]+', '_', re.sub(r'[^\w\s-]', '', str(title)).strip().lower())
+        filepath = os.path.join(export_dir, f"{clean_title}.png")
         fig.savefig(filepath, dpi=150)
 
 def _pandas_manipulation(df_local):
@@ -241,12 +242,12 @@ def _pandas_manipulation(df_local):
         'user_id': 'id_user',
         'session_id': 'id_session',
         'task_id': 'id_task',
-        'head_pose_rotation_rad_x': 'hpe_r_x',
-        'head_pose_rotation_rad_y': 'hpe_r_y',
-        'head_pose_rotation_rad_z': 'hpe_r_z',
-        'head_pose_translation_mm_x': 'hpe_t_x',
-        'head_pose_translation_mm_y': 'hpe_t_y',
-        'head_pose_translation_mm_z': 'hpe_t_z',
+        'hpe_r_rad_x': 'hpe_r_x',
+        'hpe_r_rad_y': 'hpe_r_y',
+        'hpe_r_rad_z': 'hpe_r_z',
+        'hpe_t_mm_x': 'hpe_t_x',
+        'hpe_t_mm_y': 'hpe_t_y',
+        'hpe_t_mm_z': 'hpe_t_z',
     }
     df_local = df_local.rename(columns=rename_map)
     
@@ -387,17 +388,41 @@ def analyze(args):
 # ============================================================
 
 def main():
-    CSV_PATH = r".\dataset_summary_2.csv"  
-    SEP = ","                         
+    # ============================================================
+    # ⚙️ CONFIGURATION VARIABLES
+    # Modify these values to filter the dataset and adjust the plots
+    # ============================================================
+
+    # --- Data Input Settings ---
+    # Path to the flattened dataset index generated during normalization
+    CSV_PATH = r".\dataset_summary.csv"  
+    # Delimiter used in the CSV file (usually a comma)
+    SEP = ","                               
+
+    # --- Analysis & Filtering Parameters ---
+    # Defines the grid size (NxN) used to calculate spatial gaze distribution on the screen
     N_REGIONS = 4
+    # Quantile threshold to filter out extreme coordinate outliers (e.g., 0.01 drops the top/bottom 1%)
     OUTLIER_Q = 0.01
 
+    # --- Plotting & Output Settings ---
+    # Set to True to suppress plot generation (useful if you only want to calculate/export the filtered CSV)
     NO_PLOTS = False
+    # Path to the configuration file containing custom axis limits and plot aesthetics
     PARAMS_YAML = r"visualization\gaze_analyisis_params.yaml"
-    ID_USER = 7 
-    ID_SESSION = None
-    ID_TASK = None 
 
+    # --- Data Subsetting ---
+    # Filter the dataset by specific IDs. 
+    # Set any of these to `None` to include ALL users/sessions/tasks in the analysis.
+    ID_USER = 7         # e.g., 7 analyzes only 'user_07'
+    ID_SESSION = 2      # e.g., 2 analyzes only 'session_02' (requires ID_USER to be set)
+    ID_TASK = None      # e.g., 0 analyzes only the calibration task. None analyzes all tasks.
+
+    # ============================================================
+    # 🚀 INTERNAL EXECUTION (Do not modify below this line)
+    # ============================================================
+
+    # Automatically construct the export directory based on the selected filters
     if ID_USER is not None:
         if ID_SESSION is not None:
             EXPORT_DIR = f"temp/user{ID_USER}_{ID_SESSION}"
@@ -406,6 +431,7 @@ def main():
     else:
         EXPORT_DIR = "temp/all_users"
 
+    # Map local variables to the args object expected by the analyzer
     class Args: pass
     args = Args()
     args.csv, args.sep = CSV_PATH, SEP
@@ -414,6 +440,7 @@ def main():
     args.params_yaml  = PARAMS_YAML
     args.id_user, args.id_session, args.task = ID_USER, ID_SESSION, ID_TASK
 
+    # Run the visualization pipeline
     analyze(args)
 
 if __name__ == "__main__":

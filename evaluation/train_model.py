@@ -1,4 +1,3 @@
-import argparse
 import numpy as np
 import torch
 import h5py
@@ -10,7 +9,6 @@ from pathlib import Path
 # Import your provided components
 from trainer import Trainer
 from data_loader_h5 import GazeH5Dataset  # The H5 Dataset class we built
-from utils import angular_error
 
 # --- CONFIGURATION ---
 SCRIPT_DIR = Path(__file__).resolve().parent

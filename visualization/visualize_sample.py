@@ -1,70 +1,73 @@
-from pathlib import Path
 import os
-import random
 import sys
-from read_gaze_data import Read_gaze_data
+import random
+from pathlib import Path
 
+# --- Local Imports ---
+from read_gaze_data import Read_gaze_data
 from utils import checkIfisAValidPNGPair
 from sample_overlay_plots import overlay_visualization
 
+# Add evaluation module to path for ETH-XGaze
 sys.path.append('evaluation')
 from eth_xGaze_inf import ETHXGazeEstimator
 
+# ============================================================
+# ⚙️ CONFIGURATION & PATHS
+# ============================================================
+
+TEST_IMAGE_PATH = "./example/07_00_02_img-040.png"
+SETUP_CONFIG    = "./docs/setup_config.json"
+
+# Model weights and parameters
+SHAPE_PREDICTOR = "./evaluation/modules/shape_predictor_68_face_landmarks.dat"
+FACE_MODEL      = "./visualization/face_model.txt"
+CHECKPOINT      = "./evaluation/ckpt/epoch_24_ckpt.pth.tar"
+CAMERA_INTRIN   = "./docs/camera_intrinsics.npz"
+
+
 def get_random_png(folder_path):
-    """
-    Grab a random .png file from a folder and its subfolders.
-
-    :param folder_path: Path to the root folder.
-    :return: Path to the random .png file or None if no .png file is found.
-    """
-    png_files = []
-
-    # Walk through the directory and collect all .png files
-    for root, _, files in os.walk(folder_path):
-        for file in files:
-            if file.lower().endswith('.png'):
-                png_files.append(os.path.join(root, file))
-
-    # Return a random .png file if the list is not empty
-    if png_files:
-        return random.choice(png_files)
-    else:
-        return None
+    """Grabs a random .png file from a folder and its subfolders."""
+    png_files = list(Path(folder_path).rglob("*.png"))
+    return random.choice(png_files) if png_files else None
 
 
-auxFileName = "./example/00_00_01_img-001.png"
-
-validPair, auxFilePngName, auxFileJsonName = checkIfisAValidPNGPair(auxFileName)
-
-
-est = ETHXGazeEstimator(
-    shape_predictor_path="./evaluation/modules/shape_predictor_68_face_landmarks.dat",
-    face_model_path="./visualization/face_model.txt",
-    ckpt_path="./evaluation/ckpt/epoch_24_ckpt.pth.tar",
-    camera_npz_path="./docs/camera_intrinsics.npz",
-    camera_xml_path=None,
-    device="auto",
-)
-
-if validPair:
-    print(auxFileName)
+def main():
+    # 1. Validate the input file pair (PNG + JSON)
+    is_valid, png_path, json_path = checkIfisAValidPNGPair(TEST_IMAGE_PATH)
     
-    irisbondPatchJsonReader = Read_gaze_data(auxFilePngName, auxFileJsonName)
-    irisbondPatchJsonReader.loadSetupSpecs("./docs/setup_config.json")
-    irisbondPatchJsonReader.sceneReconstruction()
-    eye3DPredictionCenter_cam = irisbondPatchJsonReader.eye3DPredictionCenter_cam
-    pogPx_screen = irisbondPatchJsonReader.pogPx_screen
-    pog_cm_cam = irisbondPatchJsonReader.pog_cm_cam
+    if not is_valid:
+        print(f"[Error] Invalid image or missing JSON for: {TEST_IMAGE_PATH}")
+        return
 
-    gazePrediction = est.predict_gaze_vector(auxFileName)
-    irisbondPatchJsonReader.addGazePrediction(gazePrediction)
+    print(f"Processing: {TEST_IMAGE_PATH}")
+
+    # 2. Initialize the ETH-XGaze Estimator
+    estimator = ETHXGazeEstimator(
+        shape_predictor_path=SHAPE_PREDICTOR,
+        face_model_path=FACE_MODEL,
+        ckpt_path=CHECKPOINT,
+        camera_npz_path=CAMERA_INTRIN,
+        camera_xml_path=None,
+        device="auto",
+    )
+
+    # 3. Load Ground Truth Data & Reconstruct 3D Scene
+    gaze_reader = Read_gaze_data(png_path, json_path)
+    gaze_reader.loadSetupSpecs(SETUP_CONFIG)
+    gaze_reader.sceneReconstruction()
+
+    # 4. Predict Gaze & Inject into Reader
+    gaze_prediction = estimator.predict_gaze_vector(TEST_IMAGE_PATH)
+    gaze_reader.addGazePrediction(gaze_prediction)
     
-    overlay_visualization(auxFileName, auxFileJsonName)
+    # 5. Generate Visualizations
+    overlay_visualization(TEST_IMAGE_PATH, json_path)
+    gaze_reader.plot3D()
+    gaze_reader.plot2D()
     
-    irisbondPatchJsonReader.plot3D()
-    irisbondPatchJsonReader.plot2D()
     input("Press Enter to continue...")
-    #irisbondPatchJsonReader.plot2D()
-else:
-    print("Invalid pair")
-    
+
+
+if __name__ == "__main__":
+    main()
