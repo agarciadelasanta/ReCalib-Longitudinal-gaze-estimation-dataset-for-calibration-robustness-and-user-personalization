@@ -132,7 +132,7 @@ class Trainer:
 
             self.optimizer.zero_grad(set_to_none=True)
 
-            with torch.cuda.amp.autocast(enabled=self.use_amp):
+            with torch.amp.autocast(enabled=self.use_amp):
                 pred_gaze = self.model(input_var)
                 loss = F.l1_loss(pred_gaze, target_var)
 

@@ -1,6 +1,4 @@
 import h5py
-import torch
-import numpy as np
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -22,29 +20,32 @@ class GazeH5Dataset(Dataset):
         self.indices = indices
         self.transform = transform
         self.is_load_label = is_load_label
+        self.hdf = None
 
     def __len__(self):
         return len(self.indices)
 
     def __getitem__(self, idx):
+        # Open HDF file lazily on first getitem to prevent issues with multithreading/multiprocessing Dataloaders
+        if self.hdf is None:
+            self.hdf = h5py.File(self.h5_path, 'r', swmr=True)
+
         # Map the local DataLoader index to the global index in the H5 file
         global_idx = self.indices[idx]
         
-        # Opening in SWMR (Single Writer Multiple Reader) mode for faster access
-        with h5py.File(self.h5_path, 'r', swmr=True) as hdf:
-            # 1. Load the pre-normalized face patch (uint8)
-            image = hdf['face_patch'][global_idx, :]
-            
-            # 2. Convert from BGR (OpenCV default) to RGB (PyTorch/PIL default)
-            image = image[:, :, [2, 1, 0]]
-            
-            # 3. Apply transformations (To Tensor & Normalize)
-            if self.transform:
-                image = self.transform(image)
+        # 1. Load the pre-normalized face patch (uint8)
+        image = self.hdf['face_patch'][global_idx, :]
+        
+        # 2. Convert from BGR (OpenCV default) to RGB (PyTorch/PIL default)
+        image = image[:, :, [2, 1, 0]]
+        
+        # 3. Apply transformations (To Tensor & Normalize)
+        if self.transform:
+            image = self.transform(image)
 
-            # 4. Load Gaze Labels (Pitch and Yaw in Radians)
-            if self.is_load_label:
-                gaze_label = hdf['face_gaze'][global_idx, :].astype('float32')
-                return image, gaze_label
-            
-            return image
+        # 4. Load Gaze Labels (Pitch and Yaw in Radians)
+        if self.is_load_label:
+            gaze_label = self.hdf['face_gaze'][global_idx, :].astype('float32')
+            return image, gaze_label
+        
+        return image

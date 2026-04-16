@@ -1,6 +1,4 @@
-import os
 import json
-import re
 from pathlib import Path
 import cv2
 import dlib
@@ -60,7 +58,7 @@ def normalizeData_face(img, face_model_6pts, landmarks_2d_6, hr, ht, K, out_size
     R = np.c_[right, down, forward].T
     
     W = cam_norm @ S @ R @ np.linalg.inv(K)
-    return cv2.warpPerspective(img, W, roiSize)
+    return cv2.warpPerspective(img, W, roiSize), R
 
 def process_dataset():
     # Initialize skip counters
@@ -86,15 +84,19 @@ def process_dataset():
     print(f"Found {len(items)} samples. Initializing H5 file...")
     OUTPUT_H5.parent.mkdir(parents=True, exist_ok=True)
 
+    total_samples = len(items)
+
     with h5py.File(str(OUTPUT_H5), "w") as h5:
-        face_patch = h5.create_dataset("face_patch", shape=(0, 224, 224, 3), maxshape=(None, 224, 224, 3), dtype=np.uint8, chunks=(1, 224, 224, 3), compression="lzf")
-        face_gaze = h5.create_dataset("face_gaze", shape=(0, 2), maxshape=(None, 2), dtype=np.float32, chunks=(1024, 2))
+        face_patch = h5.create_dataset("face_patch", shape=(total_samples, 224, 224, 3), maxshape=(None, 224, 224, 3), dtype=np.uint8, chunks=(1, 224, 224, 3), compression="lzf")
+        face_gaze = h5.create_dataset("face_gaze", shape=(total_samples, 2), maxshape=(None, 2), dtype=np.float32, chunks=(1024, 2))
         
         dt = h5py.string_dtype(encoding="utf-8")
-        m_user = h5.create_dataset("meta/user", (0,), maxshape=(None,), dtype=dt)
-        m_session = h5.create_dataset("meta/session", (0,), maxshape=(None,), dtype=dt)
-        m_task = h5.create_dataset("meta/task", (0,), maxshape=(None,), dtype=dt)
-        m_img_name = h5.create_dataset("meta/image_name", (0,), maxshape=(None,), dtype=dt)
+        m_user = h5.create_dataset("meta/user", (total_samples,), maxshape=(None,), dtype=dt)
+        m_session = h5.create_dataset("meta/session", (total_samples,), maxshape=(None,), dtype=dt)
+        m_task = h5.create_dataset("meta/task", (total_samples,), maxshape=(None,), dtype=dt)
+        m_img_name = h5.create_dataset("meta/image_name", (total_samples,), maxshape=(None,), dtype=dt)
+
+        curr_idx = 0
 
         for img_path, json_path in tqdm(items):
             try:
@@ -111,12 +113,9 @@ def process_dataset():
                 img = cv2.imread(str(img_path))
                 if img is None: continue
 
-                gaze_vec = j["gaze"]["vector"]
-                gaze_pitchyaw = gaze_vector_to_pitchyaw(gaze_vec)
-
                 # --- LANDMARK EXTRACTION ---
-                hpe = j.get("hpe", {})
-                lmk_dict = hpe.get("facial_landmarks_2D", None)
+                hpe = j.get("head_pose", {})
+                lmk_dict = hpe.get("mediapipe_face_mesh_2d", None)
                 landmarks_2d_6 = None
 
                 if lmk_dict is not None:
@@ -146,23 +145,33 @@ def process_dataset():
 
                 # --- POSE ESTIMATION & NORMALIZATION ---
                 hr, ht = estimateHeadPose(landmarks_2d_6, facePts_3d_6, K, dist)
-                img_norm = normalizeData_face(img, face_model_6pts, landmarks_2d_6, hr, ht, K)
+                img_norm, R = normalizeData_face(img, face_model_6pts, landmarks_2d_6, hr, ht, K)
+
+                # --- GAZE VECTOR NORMALIZATION ---
+                # Retrieve the original gaze vector
+                gaze_vec = np.array(j["gaze"]["vector"], dtype=np.float64).reshape(3, 1)
+                # Rotate the gaze vector into the normalized camera space
+                gaze_norm = (R @ gaze_vec).reshape(3)
+                # Convert the normalized gaze to pitch/yaw
+                gaze_pitchyaw = gaze_vector_to_pitchyaw(gaze_norm)
 
                 # --- APPEND TO H5 ---
-                curr_idx = face_patch.shape[0]
-                for ds in [face_patch, face_gaze, m_user, m_session, m_task, m_img_name]:
-                    ds.resize((curr_idx + 1,) + ds.shape[1:])
-
                 face_patch[curr_idx] = img_norm
                 face_gaze[curr_idx] = gaze_pitchyaw
-                m_user[curr_idx] = str(j["user"])
-                m_session[curr_idx] = str(j["session"])
-                m_task[curr_idx] = str(j["task"])
+                m_user[curr_idx] = str(j["user_id"])
+                m_session[curr_idx] = str(j["session_id"])
+                m_task[curr_idx] = str(j["task_id"])
                 m_img_name[curr_idx] = img_path.name
+                
+                curr_idx += 1
 
             except Exception as e:
                 print(f"Error processing {img_path.name}: {e}")
                 continue
+        
+        # Resize datasets down to the actual number of generated valid samples
+        for ds in [face_patch, face_gaze, m_user, m_session, m_task, m_img_name]:
+            ds.resize((curr_idx,) + ds.shape[1:])
     
     print(f"Processing finished. Total skipped: {n_skip}")
 

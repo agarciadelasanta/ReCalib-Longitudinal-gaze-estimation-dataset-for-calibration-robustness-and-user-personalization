@@ -1,6 +1,7 @@
 import h5py
 import numpy as np
 import cv2
+from pathlib import Path
 
 def verify_h5_integrity(h5_path):
     print(f"--- Verifying H5 File: {h5_path} ---\n")
@@ -38,14 +39,14 @@ def verify_h5_integrity(h5_path):
                 gaze_cols = h5['face_gaze'].shape[1]
                 print(f"[OK] 'face_gaze' has {gaze_cols} columns.")
 
-                # Verify 'pos' was converted to integer (if you stored it as a dataset)
-                # Note: If 'pos' is inside a metadata attributes or separate dataset:
-                if 'pos' in h5:
-                    pos_sample = h5['pos'][0]
+                # Verify 'pog_px' was converted to integer (if you stored it as a dataset)
+                # Note: If 'pog_px' is inside a metadata attributes or separate dataset:
+                if 'pog_px' in h5:
+                    pos_sample = h5['pog_px'][0]
                     if np.issubdtype(pos_sample.dtype, np.integer):
-                        print(f"[OK] 'pos' is stored as Integer: {pos_sample}")
+                        print(f"[OK] 'pog_px' is stored as Integer: {pos_sample}")
                     else:
-                        print(f"[WARNING] 'pos' is NOT an integer. Dtype: {pos_sample.dtype}")
+                        print(f"[WARNING] 'pog_px' is NOT an integer. Dtype: {pos_sample.dtype}")
 
             print(f"\nTotal Samples Verified: {len(h5['face_patch'])}")
 
@@ -79,7 +80,7 @@ def visualize_normalization(h5_path, num_samples=5):
 
             # Create a display copy
             # Note: face_patch was saved as BGR in the script
-            disp_img = img.copy()
+            disp_img = cv2.flip(img.copy(), 0)
             
             # Overlay info
             info_text = f"U:{user} S:{sess} T:{task} | P:{gaze[0]:.2f} Y:{gaze[1]:.2f}"
@@ -95,6 +96,9 @@ def visualize_normalization(h5_path, num_samples=5):
 
 # Usage
 if __name__ == "__main__":
-    h5_file = r'C:\Projects\recalib\ReCalib-A-multi-session-gaze-dataset-for-calibration-robustness-and-user-adaptation\temp\full_dataset.h5'
-    verify_h5_integrity(h5_file)
-    visualize_normalization(h5_file)
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    ROOT_DIR = SCRIPT_DIR.parent
+    H5_PATH = ROOT_DIR / 'temp' / 'full_dataset.h5'
+
+    verify_h5_integrity(H5_PATH)
+    visualize_normalization(H5_PATH)

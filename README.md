@@ -8,8 +8,7 @@ This repository is the official companion to the **ReCalib** dataset paper. ReCa
 
 ## 🔗 Links
 * **Paper:** [Insert Journal Link/DOI]
-* **Dataset (DOI):** [https://doi.org/10.5281/zenodo.XXXXXXX](https://doi.org/10.5281/zenodo.XXXXXXX)
-* **Code DOI:** [Insert Code DOI if minted]
+* **Dataset (DOI):** [https://doi.org/10.82518/A0TND2](https://doi.org/10.82518/A0TND2)
 
 ---
 
@@ -44,16 +43,16 @@ ReCalib/
 
 ## 📝 Annotation Format
 
-Each image in the ReCalib dataset is paired with a comprehensive JSON annotation file. To ensure geometric consistency, all 2D quantities (such as target positions and landmarks) are expressed in **pixels**, while all 3D quantities are expressed in **millimeters (mm)** within a camera-centered coordinate system.
+Each image in the ReCalib dataset is paired with a comprehensive JSON annotation file. To ensure geometric consistency, all 2D quantities (such as target positions and landmarks) are expressed in **pixels (px)**, while all 3D quantities are expressed in **millimeters (mm)** within a camera-centered coordinate system.
 
 ### Key Annotation Fields
 
 The following fields are included in each sample's JSON file to support model training and technical validation:
 
-* **`pog_px.x, pog_px.y`**: The 2D screen target coordinates in pixels, defining the ground truth for the visual stimulus.
-* **`gaze`**: Information regarding the totality of the elements that form the gaze in 3D space, including the `gaze.vector` (direction), `gaze.origin_mm` (starting point between the eyes), and `gaze.intersection_mm` (point on the screen plane).
-* **`head_pose.rotation_rad`**: A 3-dimensional representation of head pose rotation as eulder angles in radians $(r_x, r_y, r_z)$.
-* **`head_pose.rotation_rad`**: A 3-dimensional representation of head pose translation in millimeters $(t_x, t_y, t_z)$.
+* **`pog_px`**: The 2D screen target coordinates (`x`, `y`) in pixels, defining the ground truth for the visual stimulus.
+* **`gaze`**: Information regarding the totality of the elements that form the gaze in 3D space, including the `vector` (direction), `origin_mm` (starting point between the eyes), and `pog_mm` (Point of Gaze intersection on the screen plane).
+* **`head_pose.rotation_rad`**: A 3-dimensional representation of head pose rotation as Euler angles in radians $(r_x, r_y, r_z)$.
+* **`head_pose.translation_mm`**: A 3-dimensional representation of head pose translation in millimeters $(t_x, t_y, t_z)$.
 * **`head_pose.mediapipe_face_mesh_2d`**: Key 2D facial landmarks used by the MediaPipe Face Mesh model. See `docs/mediapipe_face_landmark.png` for a detailed explanation of each landmark index. 
 * **`quality_assurance_metrics`**: Raw quality metrics calculated during post-processing used to evaluate face detection confidence, head pose geometric consistency, and eye visibility.  
 * **`discard_info`**: Records the specific categorical reason for sample exclusion if flagged by the quality pipeline. See `docs/discarding_criteria.py` for an explanation for each discarding criteria category.
