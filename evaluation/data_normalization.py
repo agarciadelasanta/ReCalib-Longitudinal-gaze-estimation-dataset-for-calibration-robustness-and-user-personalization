@@ -11,7 +11,7 @@ from imutils import face_utils
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SCRIPT_DIR.parent
 
-INPUT_ROOT = Path(r'E:\user_personalization_tagged\Mamu\PRUEBAS')
+INPUT_ROOT = Path(r'ROOT-FOLDER-TO-RECALIB-DATASET')
 OUTPUT_H5 = ROOT_DIR / 'temp' / 'full_dataset.h5'
 
 # Make sure these paths point to your actual local files

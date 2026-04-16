@@ -12,6 +12,18 @@ This repository is the official companion to the **ReCalib** dataset paper. ReCa
 
 ---
 
+## 🛠 Installation
+
+**Requirements:** Python 3.10.15+.  
+
+```bash
+git clone https://github.com/agarciadelasanta/ReCalib-Longitudinal-gaze-estimation-dataset-for-calibration-robustness-and-user-personalization.git
+cd ReCalib
+pip install -r requirements.txt
+```
+
+---
+
 ## 📊 Dataset Structure & Access
 
 The **ReCalib** dataset is organized hierarchically to facilitate multi-session and longitudinal analysisEach participant is assigned a top-level directory, with data grouped into independent recording sessions conducted on different days.
@@ -176,23 +188,11 @@ CONFIG_VARS = {
     "target_session": "00",      # Set to None for Cross-User (Leave-One-User-Out) protocols
     "session_calibration": True, # True: uses the 9-point calibration subset; False: uses all 4 tasks
     "batch_size": 32,
-    "epochs": 5,
+    "epochs": 20,
     "ckpt_dir": "./checkpoints",
 }
 ```
 ---
-
-## 🛠 Installation
-
-**Requirements:** Python 3.8+.  
-
-```bash
-git clone https://github.com/agarciadelasanta/ReCalib-Longitudinal-gaze-estimation-dataset-for-calibration-robustness-and-user-personalization.git
-cd ReCalib
-pip install -r requirements.txt
-```
----
-
 
 ## 📜 Citation
 
@@ -204,7 +204,7 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
   author={Garcia de la Santa, Alejandro and Zulaika, Ane and Perona, Iñigo and Jodra, Jose Luis and Villanueva, Arantxa},
   journal={Scientific Data},
   year={2026},
-  doi={10.5281/zenodo.XXXXXXX}
+  doi={Insert Journal Link/DOI}
 }
 ```
 
@@ -214,8 +214,7 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 
 
 Code: MIT License.
-
-Data: Creative Commons Attribution 4.0 International (CC BY 4.0).
+Data: Creative Commons Attribution 4.0 International (CC BY-NC-SA 4.0).
 
 ---
 
