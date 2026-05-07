@@ -208,7 +208,16 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 }
 ```
 
----
+
+## Ethics & Consent
+* All participants provided informed consent for data collection and sharing for research purposes.
+* The study was approved by the **Ethics Committee of the University of the Basque Country (UPV/EHU)**.
+
+
+## Data Sensitivity Disclaimer
+> **⚠️ Note:** This dataset contains biometric information (facial images). Access is restricted and actively managed to protect participant privacy in accordance with our data sharing agreements and the CC BY-NC-SA 4.0 license.
+
+
 
 ## ⚖️ License
 
@@ -217,7 +226,6 @@ Code: MIT License.
 
 Data: Creative Commons Attribution 4.0 International (CC BY-NC-SA 4.0).
 
----
 
 ## ✉️ Contact
 
