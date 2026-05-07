@@ -1,0 +1,41 @@
+{
+    "posCam_mm": {
+        "x": 0,
+        "y": 10,
+        "z": 0
+    },
+    "screen_mm": {
+        "height": 173,
+        "width": 260
+    },
+    "screen_zoom": 2.0,
+    "screen_pixels": {
+        "height": 912,
+        "width": 1368
+    },
+    "screen_orientation": 0,
+    "deviceSpecifications": {
+        "System": "Windows",
+        "Node": "DESKTOP-URVDO2R",
+        "Release": "10",
+        "Version": "10.0.19045",
+        "Machine": "AMD64",
+        "Processor": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+        "manufacturer": "Microsoft Corporation",
+        "model": "Surface Pro 7+",
+        "name_device": "DESKTOP-URVDO2R",
+        "num_processors": 1,
+        "system_type": "x64-based PC",
+        "system_family": "Surface"
+    },
+    "img_res": {
+        "width": 1920,
+        "height": 1080
+    },
+    
+    "rotCam": {
+        "x": 0.0,
+        "y": 3.141592653589793,
+        "z": 0.0
+    }
+}
