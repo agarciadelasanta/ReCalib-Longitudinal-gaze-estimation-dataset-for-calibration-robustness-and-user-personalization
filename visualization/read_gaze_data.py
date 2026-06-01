@@ -18,20 +18,21 @@ class Read_gaze_data:
         
         if not(self.checkIfIsParsed()):
             return
-
-        self.img = cv2.imread(self.pathImg)
         
+        self.img = cv2.imread(self.pathImg)
         if self.img is None:
+            print(f"[Error] Failed to load image: {self.pathImg}")
             return
         
         self.variableInitialization()
-
+        
         if self.crop_format:
             self.loadJSONData_crop()
         else:
             self.loadJSONData()
-
-        self.sceneReconstruction()
+        # NOTE: Scene reconstruction is no longer called automatically.
+        # The user should call loadSetupSpecs() and/or sceneReconstruction()
+        # after initialization to build the 3D scene.
 
     def loadSetupSpecs(self, json_path):
         with open(json_path, 'r') as f:
@@ -101,64 +102,47 @@ class Read_gaze_data:
         self.pogPredictionPx_screen = np.array([])
 
     def loadJSONData(self):
-        # Updated from 'pos' to 'pog'
-        self.pos = np.array([self.data["pog_px"]["x"], self.data["pog_px"]["y"]])
-        
-        # Handle new gaze structure (with _mm suffix)
-        if isinstance(self.data["gaze"], dict) and "vector" in self.data["gaze"]:
-            self.gaze = np.array(self.data["gaze"]["vector"])
-            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"])
-            self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"])
-        else:
-            self.gaze = np.array(self.data["gaze"])
-            self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"]) if "origin_mm" in self.data["gaze"] else np.array([])
-            self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"]) if "pog_mm" in self.data["gaze"] else np.array([])
-        
-        # Handle screen parameters - set defaults if not present
-        if "screen_mm" in self.data:
-            self.screen_mm = np.array([self.data["screen_mm"]["width"], self.data["screen_mm"]["height"]])
-        else:
-            self.screen_mm = np.array([1920, 1080])  # default
-        
-        if "screen_pixels" in self.data:
-            self.screen_pixels = np.array([self.data["screen_pixels"]["height"], self.data["screen_pixels"]["width"]])
-        else:
-            self.screen_pixels = np.array([1080, 1920])  # default
-        
-        if "posCam_mm" in self.data:
-            self.posCam_mm = self.data["posCam_mm"]
-        else:
-            self.posCam_mm = {"x": 0, "y": 0, "z": 0}  # default
-        
-        # Reconstruct the 6D HPE array from the new nested rotation/translation lists
-        rot = self.data["head_pose"]["rotation_rad"]
-        trans = self.data["head_pose"]["translation_mm"]
+        """
+        Loads and parses data from the sample's JSON file.
+        Uses .get() for safe dictionary access and provides defaults.
+        """
+        # --- Gaze and Head Pose ---
+        gaze_data = self.data.get("gaze", {})
+        self.gaze = np.array(gaze_data.get("vector", []))
+        self.eye3DCenter_cam = np.array(gaze_data.get("origin_mm", []))
+        self.pogMm_cam = np.array(gaze_data.get("pog_mm", []))
+
+        pog_px_data = self.data.get("pog_px", {})
+        self.pos = np.array([pog_px_data.get("x", 0), pog_px_data.get("y", 0)])
+
+        head_pose_data = self.data.get("head_pose", {})
+        rot = head_pose_data.get("rotation_rad", [0, 0, 0])
+        trans = head_pose_data.get("translation_mm", [0, 0, 0])
         self.hpe = rot + trans  # Concatenating two lists into one 6-element list
 
-        if "screen_orientation" in self.data:
-            self.screen_orientation = self.data["screen_orientation"]
-        else:
-            self.screen_orientation = 0  # default
-        
-        if "screen_zoom" in self.data:
-            self.zoom = self.data["screen_zoom"]
-        else:
-            self.zoom = 1  # default
-        
-        if "img_res" in self.data:
-            self.img_res = self.data["img_res"]
-        else:
-            self.img_res = {"height": 1080, "width": 1920}  # default
+        # --- Setup Parameters (will be overwritten by loadSetupSpecs if called) ---
+        screen_mm_data = self.data.get("screen_mm", {})
+        self.screen_mm = np.array([
+            screen_mm_data.get("width", 1920),
+            screen_mm_data.get("height", 1080)
+        ])
 
+        screen_pixels_data = self.data.get("screen_pixels", {})
+        self.screen_pixels = np.array([
+            screen_pixels_data.get("height", 1080),
+            screen_pixels_data.get("width", 1920)
+        ])
+
+        self.posCam_mm = self.data.get("posCam_mm", {"x": 0, "y": 0, "z": 0})
+        self.screen_orientation = self.data.get("screen_orientation", 0)
+        self.zoom = self.data.get("screen_zoom", 1.0)
+        self.img_res = self.data.get("img_res", {"height": 1080, "width": 1920})
+
+        # Legacy adjustment, kept for compatibility
         if self.hpe[5] < 200:
             self.hpe[3] = self.hpe[3]
             self.hpe[4] = self.hpe[4]
             self.hpe[5] = self.hpe[5]
-
-        # Double assignment fix: updating to the new standard keys
-        self.pogMm_cam = np.array(self.data["gaze"]["pog_mm"])
-        self.gaze = np.array(self.data["gaze"]["vector"])
-        self.eye3DCenter_cam = np.array(self.data["gaze"]["origin_mm"])
 
     def loadJSONData_crop(self):
         self.gaze = np.array(self.data["gaze"])
