@@ -143,9 +143,18 @@ class Setup_specs:
     @property
     def camera_pos_px(self) -> NDArrayF:
         """Camera origin projected to screen pixels (2-D)."""
+        # This calculation determines the camera's (x, y) pixel coordinates
+        # for 2D plotting purposes. It assumes the plot canvas may be larger
+        # than the screen area itself.
+        # 1. `self.camera_pos_x * self.width_ratio`: Converts the camera's
+        #    horizontal position from mm (in screen frame) to pixels.
+        # 2. `self.screen_width_px / (2 * self.zoom)`: This term simplifies to
+        #    (raw_screen_width_px / 2). It acts as an offset. The exact
+        #    meaning depends on the 2D plotter's coordinate system, but it
+        #    helps center or position the camera icon correctly on the plot.
         return np.array([
-            self.camera_pos_x * self.width_ratio - self.screen_width_px/(2*self.zoom),
-            self.camera_pos_y * self.height_ratio // self.zoom,
+            self.camera_pos_x * self.width_ratio - self.screen_width_px / (2 * self.zoom),
+            self.camera_pos_y * self.height_ratio / self.zoom,
         ])
 
     # ───────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import os
 import sys
 import random
+import argparse
 from pathlib import Path
 
 # --- Local Imports ---
@@ -16,7 +17,7 @@ from eth_xGaze_inf import ETHXGazeEstimator
 # ⚙️ CONFIGURATION & PATHS
 # ============================================================
 
-TEST_IMAGE_PATH = "./example/07_00_02_img-040.png"
+DEFAULT_TEST_IMAGE = "./example/07_00_02_img-040.png"
 SETUP_CONFIG    = "./docs/setup_config.json"
 
 # Model weights and parameters
@@ -26,21 +27,20 @@ CHECKPOINT      = "./evaluation/ckpt/epoch_24_ckpt.pth.tar"
 CAMERA_INTRIN   = "./docs/camera_intrinsics.npz"
 
 
-def get_random_png(folder_path):
-    """Grabs a random .png file from a folder and its subfolders."""
-    png_files = list(Path(folder_path).rglob("*.png"))
-    return random.choice(png_files) if png_files else None
-
-
 def main():
+    parser = argparse.ArgumentParser(description="Visualize a sample from the ReCalib dataset with gaze prediction.")
+    parser.add_argument("image_path", nargs='?', default=DEFAULT_TEST_IMAGE,
+                        help=f"Path to the input PNG image. Defaults to: {DEFAULT_TEST_IMAGE}")
+    args = parser.parse_args()
+
     # 1. Validate the input file pair (PNG + JSON)
-    is_valid, png_path, json_path = checkIfisAValidPNGPair(TEST_IMAGE_PATH)
+    is_valid, png_path, json_path = checkIfisAValidPNGPair(args.image_path)
     
     if not is_valid:
-        print(f"[Error] Invalid image or missing JSON for: {TEST_IMAGE_PATH}")
+        print(f"[Error] Invalid image or missing JSON for: {args.image_path}")
         return
 
-    print(f"Processing: {TEST_IMAGE_PATH}")
+    print(f"Processing: {png_path}")
 
     # 2. Initialize the ETH-XGaze Estimator
     estimator = ETHXGazeEstimator(
@@ -53,16 +53,19 @@ def main():
     )
 
     # 3. Load Ground Truth Data & Reconstruct 3D Scene
+    # Note: Read_gaze_data __init__ calls sceneReconstruction once.
+    # It's called again below after loading setup specs. This is inefficient
+    # but ensures the final state uses the global setup config.
     gaze_reader = Read_gaze_data(png_path, json_path)
     gaze_reader.loadSetupSpecs(SETUP_CONFIG)
     gaze_reader.sceneReconstruction()
 
     # 4. Predict Gaze & Inject into Reader
-    gaze_prediction = estimator.predict_gaze_vector(TEST_IMAGE_PATH)
+    gaze_prediction = estimator.predict_gaze_vector(png_path)
     gaze_reader.addGazePrediction(gaze_prediction)
     
     # 5. Generate Visualizations
-    overlay_visualization(TEST_IMAGE_PATH, json_path)
+    overlay_visualization(png_path, json_path, pred_vector=gaze_prediction)
     gaze_reader.plot3D()
     gaze_reader.plot2D()
     

@@ -211,7 +211,7 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 
 ## Ethics & Consent
 * All participants provided informed consent for data collection and sharing for research purposes.
-* The study was approved by the **Ethics Committee of the University of the Basque Country (UPV/EHU)**.
+* The study was approved by the **Ethics Committee of the University of the Basque Country (UPV/EHU)** (Approval Code: **PI_2026_022**).
 
 
 ## Data Sensitivity Disclaimer

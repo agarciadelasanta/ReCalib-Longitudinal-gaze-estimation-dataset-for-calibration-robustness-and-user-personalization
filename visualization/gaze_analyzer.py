@@ -242,20 +242,37 @@ def _pandas_manipulation(df_local):
         'user_id': 'id_user',
         'session_id': 'id_session',
         'task_id': 'id_task',
-        'hpe_r_rad_x': 'hpe_r_x',
-        'hpe_r_rad_y': 'hpe_r_y',
-        'hpe_r_rad_z': 'hpe_r_z',
-        'hpe_t_mm_x': 'hpe_t_x',
-        'hpe_t_mm_y': 'hpe_t_y',
-        'hpe_t_mm_z': 'hpe_t_z',
+        
+        # Traducir los nuevos nombres de Head Pose (Pose de cabeza)
+        'head_rot_x': 'hpe_r_x',
+        'head_rot_y': 'hpe_r_y',
+        'head_rot_z': 'hpe_r_z',
+        'head_trans_x': 'hpe_t_x',
+        'head_trans_y': 'hpe_t_y',
+        'head_trans_z': 'hpe_t_z',
+        
+        # Traducir los nuevos nombres de Origen y Punto de mirada (POG)
+        'gaze_origin_x': 'gaze_origin_mm_x',
+        'gaze_origin_y': 'gaze_origin_mm_y',
+        'gaze_origin_z': 'gaze_origin_mm_z',
+        'gaze_pog_x': 'gaze_pog_mm_x',
+        'gaze_pog_y': 'gaze_pog_mm_y',
+        'gaze_pog_z': 'gaze_pog_mm_z'
     }
+    
     df_local = df_local.rename(columns=rename_map)
     
+    # Mapear las nuevas etiquetas de las tareas (9-point/16-point) 
+    # a las que esperan los gráficos (calibration/test)
     if 'task_type' in df_local.columns:
         df_local['task_type'] = df_local['task_type'].replace({
             '9-point': 'calibration',
-            '16-point': 'test'
+            '16-point': 'test',
+            # Por si acaso en algún momento usas mayúsculas:
+            '9-Point': 'calibration',
+            '16-Point': 'test'
         })
+        
     return df_local
 
 
@@ -297,9 +314,7 @@ def analyze(args):
     
     # 2. DISCARD FLAGGED SAMPLES
     if 'discard_info' in df.columns:
-        df = df[df['discard_info'].isna()]
-    elif 'discard_info_discarded' in df.columns:
-        df = df[df['discard_info_discarded'].isna() | (df['discard_info_discarded'] == False)]
+        df = df[df['discard_info'] == 'NO_DISCARDED']
         
     print(f"After sample discard CSV: {len(df)} rows, {len(df.columns)} columns")
     
