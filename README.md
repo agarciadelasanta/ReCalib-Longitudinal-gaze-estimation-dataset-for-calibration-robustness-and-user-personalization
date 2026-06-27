@@ -215,17 +215,16 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 
 
 ## Data Sensitivity Disclaimer
-> **⚠️ Note:** This dataset contains biometric information (facial images). Access is restricted and actively managed to protect participant privacy in accordance with our data sharing agreements and the CC BY-NC-SA 4.0 license.
-
+> **⚠️ Note:** This dataset contains raw biometric human data (unmasked facial images). To protect participant privacy and maintain strict compliance with GDPR and institutional ethical mandates, the complete dataset is shared under a Controlled Access framework. Access is managed manually and requires a verified institutional identity and the electronic signature of our formal Data Usage Agreement (DUA). For immediate technical evaluation, an unrestricted, fully open-access sample of the dataset (recalib_sample.tar) is provided without any registration barriers.
 
 
 ## ⚖️ License
 
-
 Code: MIT License.
 
-Data: Creative Commons Attribution 4.0 International (CC BY-NC-SA 4.0).
+Complete Dataset: Governed strictly by the ReCalib Data Usage Agreement (DUA). Note: Due to biometric privacy requirements and the legal framework of Controlled Access, no standard open Creative Commons license applies to the restricted files.
 
+Open-Access Dataset Sample (recalib_sample.tar): Creative Commons Attribution 4.0 International (CC BY 4.0).
 
 ## ✉️ Contact
 
