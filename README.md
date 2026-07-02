@@ -4,11 +4,24 @@ This repository is the official companion to the **ReCalib** dataset paper. ReCa
 
 "Gaze estimation datasets have traditionally focused on increasing variability in gaze direction, head pose, illumination, and user appearance in order to improve cross-user generalization. However, datasets explicitly structured to support calibration analysis and user personalization remain limited. We present ReCalib, a longitudinal eye-tracking dataset designed to facilitate research on calibration robustness and personalization in webcam-based gaze estimation systems. The dataset contains recordings from nine participants acquired across 188 sessions under realistic assistive communication scenarios, resulting in approximately 150,000 images. Each session follows a structured protocol consisting of a 9-point calibration task followed by several independent 16-point test tasks, enabling a clear separation between calibration and evaluation phases. Each sample is annotated with screen target coordinates, head pose estimates, key facial landmarks, and a 3D gaze vector. The dataset supports research on domain adaptation, user personalization, and session-level recalibration in gaze estimation systems."
 
+**Keywords:** Gaze Estimation, Eye-Tracking, Assistive Alternative Communication, Computer Vision, Dataset, HCI.
+
+---
+
+### 👥 Authorship & Affiliations
+| Name | Institutional Affiliation | ORCID |
+| :--- | :--- | :--- |
+| **Alejandro García de la Santa Ramos** | University of the Basque Country (UPV/EHU) / Irisbond | [0000-0002-1357-6135](https://orcid.org/0000-0002-1357-6135) |
+| **Ane Zulaika** | Irisbond Crowdbonding SL, Donostia, Spain | [0009-0004-3277-8033](https://orcid.org/0009-0004-3277-8033) |
+| **Iñigo Perona** | University of the Basque Country (UPV/EHU) | [0000-0002-9246-3736](https://orcid.org/0000-0002-9246-3736) |
+| **Jose Luis Jodra** | University of the Basque Country (UPV/EHU) | [0000-0003-2453-9521](https://orcid.org/0000-0003-2453-9521) |
+| **Arantxa Villanueva** | Public University of Navarre (UPNA), Pamplona, Spain | [0000-0001-9822-2530](https://orcid.org/0000-0001-9822-2530) |
+
+* **Dataset Contact:** Alejandro García de la Santa Ramos (agarciadelasan001@ikasle.ehu.eus)
 ---
 
 ## 🔗 Links
-* **Paper:** [Insert Journal Link/DOI]
-* **Dataset (DOI):** [https://doi.org/10.82518/A0TND2](https://doi.org/10.82518/A0TND2)
+* **Dataset Repository (DOI):** [https://doi.org/10.82518/A0TND2](https://doi.org/10.82518/A0TND2)
 
 ---
 
@@ -200,12 +213,16 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 
 ```bibtex
 @article{recalib2026,
-  title={Longitudinal gaze estimation dataset for calibration robustness and user-specific personalization},
-  author={Garcia de la Santa, Alejandro and Zulaika, Ane and Perona, Iñigo and Jodra, Jose Luis and Villanueva, Arantxa},
-  journal={Scientific Data},
-  year={2026},
-  doi={Insert Journal Link/DOI}
+  author = {Alejandro Garcia de la Santa Ramos and Ane Zulaika and Iñigo Perona and Jose Luis Jodra and Arantxa Villanueva},
+  publisher = {DIPC data repository},
+  title = {{Replication Data for: Longitudinal gaze estimation dataset for calibration robustness and user-specific personalization}},
+  UNF = {UNF:6:YANxcL38aNOxbL+5Q1dbBQ==},
+  year = {2026},
+  version = {V1},
+  doi = {10.82518/A0TND2},
+  url = {https://doi.org/10.82518/A0TND2}
 }
+
 ```
 
 
@@ -215,18 +232,25 @@ If you use the ReCalib dataset, annotations, or code in your research, please ci
 
 
 ## Data Sensitivity Disclaimer
-> **⚠️ Note:** This dataset contains raw biometric human data (unmasked facial images). To protect participant privacy and maintain strict compliance with GDPR and institutional ethical mandates, the complete dataset is shared under a Controlled Access framework. Access is managed manually and requires a verified institutional identity and the electronic signature of our formal Data Usage Agreement (DUA). For immediate technical evaluation, an unrestricted, fully open-access sample of the dataset (recalib_sample.tar) is provided without any registration barriers.
+> **⚠️ Note:** This dataset contains raw biometric human data (unmasked facial images). To protect participant privacy and maintain strict compliance with GDPR and institutional ethical mandates, the complete dataset is shared under a Controlled Access framework. Access is managed manually and requires a verified institutional identity and the acceptance of our formal Data Usage Agreement (DUA).
+
+## 💸 Grant & Funding Information
+This dataset was developed with the support of the following research grants:
+* **Basque Government:** ADIAN Project & IT1437-22.
+* **Basque Government BIKAINTEK:** Grant 027-B2/2023.
+* **Spanish Ministry of Science and Innovation (MCIN/AEI/10.13039/501100011033):** Grant PID2021-123087OB-I00, co-funded by the European Regional Development Fund (ERDF) "A way of making Europe".
 
 
 ## ⚖️ License
 
 Code: MIT License.
 
-Complete Dataset: Governed strictly by the ReCalib Data Usage Agreement (DUA). Note: Due to biometric privacy requirements and the legal framework of Controlled Access, no standard open Creative Commons license applies to the restricted files.
+Complete Restricted Dataset: Governed strictly by the ReCalib Data Usage Agreement (DUA). No standard open Creative Commons license applies to the restricted files due to biometric data protection frameworks.
 
 Open-Access Dataset Sample (recalib_sample.tar): Creative Commons Attribution 4.0 International (CC BY 4.0).
 
 ## ✉️ Contact
 
 For questions regarding reproducibility or dataset access, please open an issue in this repository or contact the main author directly:
-a.garcia@irisbond.com
+* agarciadelasan001@ikasle.ehu.eus 
+* a.garcia@irisbond.com 
