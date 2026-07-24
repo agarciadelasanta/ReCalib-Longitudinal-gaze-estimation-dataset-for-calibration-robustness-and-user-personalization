@@ -141,6 +141,33 @@ This repository provides the tools necessary to parse, visualize, and evaluate t
 
 The `visualization/` directory provides tools to inspect the dataset's geometric annotations and verify model performance through 3D interactive and 2D overlays.
 
+### `explore_dataset.py`
+
+This is the recommended starting point for understanding the dataset. It
+generates a self-contained interactive HTML report from the bundled
+`dataset_summary.csv`, without requiring the restricted image dataset.
+
+The report provides cascading participant, session, task, and quality filters;
+exact sample and acceptance counts; longitudinal session coverage; task and
+discard-reason summaries; sampled head-pose coverage; screen-target density;
+and a per-session breakdown.
+
+```bash
+# Generate temp/recalib_dataset_explorer.html
+python visualization/explore_dataset.py
+
+# Generate it and open it in the default browser
+python visualization/explore_dataset.py --open
+
+# Start on one participant/session and choose another output path
+python visualization/explore_dataset.py --id-user 7 --id-session 13 --output results/explorer.html
+```
+
+Interactive continuous plots use a deterministic sample to keep the report
+responsive, while all displayed counts remain exact. Run
+`python visualization/explore_dataset.py --help` for CSV, initial-filter,
+output, sampling, and browser options.
+
 ## `visualize_sample.py`
 This is the main utility for data inspection. It supports both ground-truth visualization and inference verification.
 
