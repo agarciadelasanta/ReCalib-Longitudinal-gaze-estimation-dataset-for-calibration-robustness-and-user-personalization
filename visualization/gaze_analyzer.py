@@ -306,7 +306,7 @@ def analyze(args):
     
     id_user, id_session, id_task = args.id_user, args.id_session, args.task
                 
-    df = pd.read_csv(args.csv, sep=args.sep)
+    df = pd.read_csv(args.csv, sep=args.sep, low_memory=False)
     print(f"Loaded CSV: {len(df)} rows, {len(df.columns)} columns")
     
     # 1. APPLY MAPPING FIRST
@@ -396,4 +396,5 @@ def analyze(args):
         save_all_figures(os.path.join(args.export_dir, "plots"))
         df.to_csv(os.path.join(args.export_dir, "augmented.csv"), index=False, sep=args.sep)
 
-    plt.show(block=True)
+    if not args.no_plots:
+        plt.show(block=True)
