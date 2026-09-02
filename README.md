@@ -147,10 +147,20 @@ This is the recommended starting point for understanding the dataset. It
 generates a self-contained interactive HTML report from the bundled
 `dataset_summary.csv`, without requiring the restricted image dataset.
 
-The report provides cascading participant, session, task, and quality filters;
-exact sample and acceptance counts; longitudinal session coverage; task and
-discard-reason summaries; sampled head-pose coverage; screen-target density;
-and a per-session breakdown.
+The report provides cascading participant, session, and task filters; exact
+sample counts; longitudinal session coverage; and a per-session breakdown. An
+Overview tab contains those aggregate views, while a Sample distributions tab
+contains the interactive target and head-pose analyses. Every section in the
+Sample distributions tab can be minimized or reopened from its header. Rotation
+views compare yaw/pitch coverage, pitch/yaw/roll distributions, and central 90%
+spans across individual tasks. Matching translation views cover
+horizontal/depth position, x/y/z distributions, and central 90% spans in
+centimeters. Both two-dimensional coverage views can switch between raw points
+and sample-size-normalized population-density regions. Rotation coverage can
+also switch between yaw/pitch and roll/yaw, while translation coverage can
+switch between horizontal/depth and horizontal/vertical. The screen-target
+panel uses physical centimeters, includes pixel coordinates in hover details,
+and acts as a multi-select cross-filter for the rest of the report.
 
 ```bash
 # Generate temp/recalib_dataset_explorer.html
@@ -161,12 +171,15 @@ python visualization/explore_dataset.py --open
 
 # Start on one participant/session and choose another output path
 python visualization/explore_dataset.py --id-user 7 --id-session 13 --output results/explorer.html
+
+# Use a different acquisition setup for pixel-to-centimeter conversion
+python visualization/explore_dataset.py --setup-config path/to/setup_config.json
 ```
 
-Interactive continuous plots use a deterministic sample to keep the report
-responsive, while all displayed counts remain exact. Run
+Head-pose plots use a deterministic sample to keep the report responsive,
+while displayed counts and screen-target coverage remain exact. Run
 `python visualization/explore_dataset.py --help` for CSV, initial-filter,
-output, sampling, and browser options.
+output, setup, sampling, and browser options.
 
 ## `visualize_sample.py`
 This is the main utility for data inspection. It supports both ground-truth visualization and inference verification.
