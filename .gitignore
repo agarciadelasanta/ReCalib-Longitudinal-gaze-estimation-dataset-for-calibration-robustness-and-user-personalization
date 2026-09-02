@@ -11,3 +11,6 @@ checkpoints/
 *.csv
 *.pyc
 *.html
+
+.agents/
+logs/
