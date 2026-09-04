@@ -379,19 +379,21 @@ const warning = document.getElementById("warning");
 const numericFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
 const integerFormat = new Intl.NumberFormat();
 const statisticColumns = ["estimate", "ci_low", "ci_high", "p_value", "q_value"];
+const statisticLabels = {estimate:"Estimate", ci_low:"95% CI lower bound", ci_high:"95% CI upper bound", p_value:"p-value", q_value:"FDR-adjusted q-value"};
 
 function unique(values) { return [...new Set(values)].sort(); }
 function isNumber(value) { return typeof value === "number" && Number.isFinite(value); }
 function formatValue(value) { return isNumber(value) ? numericFormat.format(value) : "—"; }
 function label(value) { return String(value).replaceAll("_", " "); }
+function statisticLabel(value) { return statisticLabels[value] || label(value); }
 
-function setOptions(select, values, preferred = null) {
+function setOptions(select, values, preferred = null, optionLabel = label) {
   const current = preferred ?? select.value;
   select.replaceChildren();
   for (const value of values) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = label(value);
+    option.textContent = optionLabel(value);
     select.appendChild(option);
   }
   if (values.includes(current)) select.value = current;
@@ -410,7 +412,7 @@ function refreshDependentControls() {
   setOptions(taskFilter, unique(familyRows.map(row => row.task_type)), taskFilter.value || "16-point");
   setOptions(viewFilter, unique(familyRows.map(row => row.view)), viewFilter.value || "target_conditioned");
   const availableStatistics = statisticColumns.filter(column => familyRows.some(row => isNumber(row[column])));
-  setOptions(statisticFilter, availableStatistics, statisticFilter.value || "estimate");
+  setOptions(statisticFilter, availableStatistics, statisticFilter.value || "estimate", statisticLabel);
 }
 
 function selectedRows() {
@@ -460,6 +462,15 @@ function summary(rows, statistic) {
   return { extreme, median };
 }
 
+function pairDetailParts(row, statistic) {
+  const parts = [`${statisticLabel(statistic)} ${formatValue(row[statistic])}`];
+  if (statistic !== "estimate" && isNumber(row.estimate)) parts.push(`Estimate ${formatValue(row.estimate)}`);
+  if (isNumber(row.ci_low) && isNumber(row.ci_high)) parts.push(`95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}`);
+  if (isNumber(row.p_value)) parts.push(`p-value ${formatValue(row.p_value)}`);
+  if (isNumber(row.q_value)) parts.push(`q-value ${formatValue(row.q_value)}`);
+  return parts;
+}
+
 function renderMatrix(rows) {
   const statistic = statisticFilter.value;
   const significance = ["p_value", "q_value"].includes(statistic);
@@ -475,11 +486,11 @@ function renderMatrix(rows) {
     const a = users.indexOf(row.user_a);
     const b = users.indexOf(row.user_b);
     z[a][b] = row[statistic]; z[b][a] = row[statistic];
-    const detail = `Estimate ${formatValue(row.estimate)}<br>95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}<br>p ${formatValue(row.p_value)} · q ${formatValue(row.q_value)}`;
+    const detail = pairDetailParts(row, statistic).join("<br>");
     details[a][b] = detail; details[b][a] = detail;
   }
   if (!rows.length || !z.some(row => row.some(isNumber))) {
-    renderEmpty("matrix-chart", `No ${label(statistic)} values are available for this selection.`);
+    renderEmpty("matrix-chart", `No ${statisticLabel(statistic)} values are available for this selection.`);
     document.getElementById("max-pair").textContent = "—";
     document.getElementById("max-value").textContent = "—";
     document.getElementById("median-value").textContent = "—";
@@ -489,8 +500,8 @@ function renderMatrix(rows) {
   Plotly.react("matrix-chart", [{
     type: "heatmap", x: users, y: users, z, customdata: details,
     colorscale: [[0, colors.low], [0.5, colors.mid], [1, colors.high]],
-    colorbar: { title: label(statistic), thickness: 14 },
-    hovertemplate: "User %{y} vs user %{x}<br>" + label(statistic) + " %{z:.4f}<br>%{customdata}<extra></extra>"
+    colorbar: { title: statisticLabel(statistic), thickness: 14 },
+    hovertemplate: "User %{y} vs user %{x}<br>%{customdata}<extra></extra>"
   }], layout({
     xaxis: { title: "Participant", side: "bottom" },
     yaxis: { title: "Participant", autorange: "reversed", scaleanchor: "x" },
@@ -509,9 +520,7 @@ function renderMatrix(rows) {
       || (item.user_a === point.y && item.user_b === point.x));
     if (!row) return;
     document.getElementById("pair-selection").textContent =
-      `Users ${row.user_a}–${row.user_b}: estimate ${formatValue(row.estimate)}, ` +
-      `95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}, ` +
-      `p ${formatValue(row.p_value)}, q ${formatValue(row.q_value)}.`;
+      `Users ${row.user_a}–${row.user_b}: ${pairDetailParts(row, statistic).join(", ")}.`;
   });
 }
 
@@ -534,9 +543,9 @@ function renderRanking(rows) {
     y: ranking.map(row => `User ${row.user}`), x: ranking.map(row => row.value),
     marker: { color: theme().accent },
     text: ranking.map(row => formatValue(row.value)), textposition: "auto",
-    hovertemplate: "%{y}<br>Mean " + label(statistic) + " %{x:.4f}<extra></extra>"
+    hovertemplate: "%{y}<br>Mean " + statisticLabel(statistic) + " %{x:.4f}<extra></extra>"
   }], layout({
-    xaxis: { title: `Mean ${label(statistic)}`, gridcolor: theme().border },
+    xaxis: { title: `Mean ${statisticLabel(statistic)}`, gridcolor: theme().border },
     yaxis: { automargin: true }
   }), plotConfig);
 }
@@ -604,6 +613,9 @@ function renderTable(rows) {
 
 function renderWarning(rows) {
   const messages = [];
+  if (!rows.some(row => isNumber(row.ci_low) && isNumber(row.ci_high)) && !rows.some(row => isNumber(row.p_value) || isNumber(row.q_value))) {
+    messages.push("95% confidence intervals and p/q values are unavailable because this report was generated without bootstrap or permutation iterations.");
+  }
   if (statisticFilter.value !== "estimate" && !rows.some(row => isNumber(row[statisticFilter.value]))) {
     messages.push("This report was generated without the selected inferential statistic.");
   }

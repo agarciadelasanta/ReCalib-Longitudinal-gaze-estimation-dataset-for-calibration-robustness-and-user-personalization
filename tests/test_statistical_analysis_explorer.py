@@ -96,6 +96,20 @@ class StatisticalAnalysisExplorerTests(unittest.TestCase):
             self.assertIn("profile-chart", explorer)
             self.assertIn("mismatch-chart", explorer)
             self.assertNotIn("__PAIRWISE_JSON__", explorer)
+            self.assertNotIn(
+                "const detail = `Estimate ${formatValue(row.estimate)}<br>95% CI",
+                explorer,
+            )
+            self.assertNotIn(
+                'label(statistic) + " %{z:.4f}<br>%{customdata}', explorer
+            )
+            self.assertNotIn(
+                'Mean " + label(statistic) + " %{x:.4f}', explorer
+            )
+            self.assertIn(
+                "95% confidence intervals and p/q values are unavailable",
+                explorer,
+            )
 
 
 if __name__ == "__main__":

@@ -294,6 +294,28 @@ within-participant session instability, calibration/test mismatch, and the
 underlying pairwise values. Its filters select the feature family, KPI, task,
 raw or target-conditioned view, and estimate or inferential statistic.
 
+Compare two identically structured CSVs as independent datasets:
+
+```powershell
+python -m statistical_analysis compare dataset_a.csv dataset_b.csv `
+  --output temp\dataset_comparison `
+  --name-a Dataset-A `
+  --name-b Dataset-B `
+  --bootstrap 0 `
+  --permutations 0
+
+python visualization\explore_dataset_comparison.py `
+  --report-dir temp\dataset_comparison `
+  --open
+```
+
+This produces an overall hierarchical domain-gap vector rather than matching
+rows, users, task names, or task schedules between files. See
+[docs/independent_dataset_comparison.md](docs/independent_dataset_comparison.md)
+for the statistical interpretation and inferential workflow.
+The current ReCalib-versus-Targets findings are explained in
+[docs/recalib_targets_comparison_interpretation.md](docs/recalib_targets_comparison_interpretation.md).
+
 See [docs/statistical_analysis.md](docs/statistical_analysis.md) for metric
 definitions, the inferential workflow, the output schema, and limitations.
 

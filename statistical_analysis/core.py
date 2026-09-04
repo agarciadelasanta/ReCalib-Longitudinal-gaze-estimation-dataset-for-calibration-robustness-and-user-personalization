@@ -116,6 +116,104 @@ class AnalysisResult:
     column_catalog: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
+def _prepare_accepted_frame(
+    frame: pd.DataFrame,
+    config: AnalysisConfig,
+    *,
+    require_task_type: bool = True,
+) -> pd.DataFrame:
+    """Validate one summary frame, exclude discarded rows, and derive features."""
+
+    required = {"user_id", "session_id", "discarded"}
+    if require_task_type:
+        required.add("task_type")
+    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
+        required.update({"pog_px_x", "pog_px_y"})
+    for family in config.feature_families:
+        if family not in FEATURE_COLUMNS:
+            raise ValueError(f"Unknown feature family: {family}")
+        required.update(FEATURE_SOURCES[family])
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+    accepted = frame.loc[_accepted_mask(frame["discarded"])].copy()
+    identity_columns = ["user_id", "session_id"]
+    if "task_type" in accepted:
+        identity_columns.append("task_type")
+    for column in identity_columns:
+        accepted[column] = accepted[column].astype("string")
+
+    numeric_columns = set()
+    for family in config.feature_families:
+        numeric_columns.update(FEATURE_SOURCES[family])
+    if "target_conditioned" in config.views:
+        numeric_columns.update({"pog_px_x", "pog_px_y"})
+        numeric_columns.update(
+            column
+            for column in ("screen_width_px", "screen_height_px")
+            if column in accepted
+        )
+    for column in sorted(numeric_columns):
+        original = accepted[column]
+        numeric = pd.to_numeric(original, errors="coerce")
+        invalid = original.notna() & numeric.isna()
+        if invalid.any():
+            raise ValueError(
+                f"Column {column!r} contains {int(invalid.sum())} non-numeric "
+                "accepted values"
+            )
+        accepted[column] = numeric
+    accepted = accepted.copy()
+
+    if "gaze_direction" in config.feature_families:
+        gaze = accepted[list(FEATURE_SOURCES["gaze_direction"])].to_numpy(float)
+        norms = np.linalg.norm(gaze, axis=1, keepdims=True)
+        normalized = np.divide(
+            gaze,
+            norms,
+            out=np.full_like(gaze, np.nan),
+            where=norms > 1e-12,
+        )
+        accepted["_gaze_pitch"] = -np.arcsin(np.clip(normalized[:, 1], -1.0, 1.0))
+        accepted["_gaze_yaw"] = np.arctan2(-normalized[:, 0], -normalized[:, 2])
+    if any(family.startswith("landmark_") for family in config.feature_families):
+        landmark_values = accepted[list(LANDMARK_SOURCE_COLUMNS)].to_numpy(float)
+        points = landmark_values.reshape(len(accepted), len(LANDMARK_IDS), 2)
+        centers = np.nanmean(points, axis=1)
+        centered = points - centers[:, None, :]
+        scales = np.sqrt(np.nanmean(np.sum(centered**2, axis=2), axis=1))
+        normalized_shape = np.divide(
+            centered,
+            scales[:, None, None],
+            out=np.full_like(centered, np.nan),
+            where=scales[:, None, None] > 1e-12,
+        )
+        accepted["_landmark_center_x"] = centers[:, 0]
+        accepted["_landmark_center_y"] = centers[:, 1]
+        accepted["_landmark_scale"] = scales
+        shape_frame = pd.DataFrame(
+            normalized_shape.reshape(len(accepted), -1),
+            index=accepted.index,
+            columns=FEATURE_COLUMNS["landmark_shape"],
+        )
+        accepted = pd.concat([accepted, shape_frame], axis=1)
+    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
+        width = pd.Series(2736.0, index=accepted.index)
+        height = pd.Series(1824.0, index=accepted.index)
+        if "screen_width_px" in accepted:
+            observed_width = pd.to_numeric(accepted["screen_width_px"], errors="coerce")
+            width = observed_width.where(observed_width > 0, width)
+        if "screen_height_px" in accepted:
+            observed_height = pd.to_numeric(accepted["screen_height_px"], errors="coerce")
+            height = observed_height.where(observed_height > 0, height)
+        accepted["_pog_norm_x"] = accepted["pog_px_x"] / width
+        accepted["_pog_norm_y"] = accepted["pog_px_y"] / height
+        accepted["_target_x"] = accepted["_pog_norm_x"].round(4)
+        accepted["_target_y"] = accepted["_pog_norm_y"].round(4)
+    return accepted
+
+
 def _accepted_mask(values: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(values):
         return ~values.fillna(False)
@@ -469,52 +567,8 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
     """Analyze an in-memory ReCalib summary frame through one stable seam."""
 
     config = config or AnalysisConfig()
-    required = {"user_id", "session_id", "task_type", "discarded"}
-    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
-        required.update({"pog_px_x", "pog_px_y"})
-    for family in config.feature_families:
-        if family not in FEATURE_COLUMNS:
-            raise ValueError(f"Unknown feature family: {family}")
-        required.update(FEATURE_SOURCES[family])
-    missing = sorted(required.difference(frame.columns))
-    if missing:
-        raise ValueError(f"Missing required columns: {', '.join(missing)}")
-
-    accepted = frame.loc[_accepted_mask(frame["discarded"])].copy()
+    accepted = _prepare_accepted_frame(frame, config)
     rng = np.random.default_rng(config.random_seed)
-    if "gaze_direction" in config.feature_families:
-        gaze = accepted[list(FEATURE_SOURCES["gaze_direction"])].to_numpy(float)
-        norms = np.linalg.norm(gaze, axis=1, keepdims=True)
-        normalized = np.divide(
-            gaze,
-            norms,
-            out=np.full_like(gaze, np.nan),
-            where=norms > 1e-12,
-        )
-        accepted["_gaze_pitch"] = -np.arcsin(np.clip(normalized[:, 1], -1.0, 1.0))
-        accepted["_gaze_yaw"] = np.arctan2(-normalized[:, 0], -normalized[:, 2])
-    if any(family.startswith("landmark_") for family in config.feature_families):
-        landmark_values = accepted[list(LANDMARK_SOURCE_COLUMNS)].to_numpy(float)
-        points = landmark_values.reshape(len(accepted), len(LANDMARK_IDS), 2)
-        centers = np.nanmean(points, axis=1)
-        centered = points - centers[:, None, :]
-        scales = np.sqrt(np.nanmean(np.sum(centered**2, axis=2), axis=1))
-        normalized_shape = np.divide(
-            centered,
-            scales[:, None, None],
-            out=np.full_like(centered, np.nan),
-            where=scales[:, None, None] > 1e-12,
-        )
-        accepted["_landmark_center_x"] = centers[:, 0]
-        accepted["_landmark_center_y"] = centers[:, 1]
-        accepted["_landmark_scale"] = scales
-        for index, column in enumerate(FEATURE_COLUMNS["landmark_shape"]):
-            accepted[column] = normalized_shape.reshape(len(accepted), -1)[:, index]
-    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
-        accepted["_pog_norm_x"] = accepted["pog_px_x"] / 2736.0
-        accepted["_pog_norm_y"] = accepted["pog_px_y"] / 1824.0
-        accepted["_target_x"] = accepted["_pog_norm_x"].round(4)
-        accepted["_target_y"] = accepted["_pog_norm_y"].round(4)
     rows: list[dict[str, Any]] = []
     profile_rows: list[dict[str, Any]] = []
     raw_units: dict[tuple[str, str], pd.DataFrame] = {}

@@ -34,6 +34,9 @@ run high-resolution inference for the families needed in a final analysis.
 
 Use `python -m statistical_analysis --help` for every option.
 
+To compare two CSV files as independent datasets, use the separate workflow in
+[Comparing Two Independent Dataset CSVs](independent_dataset_comparison.md).
+
 ## Interactive explorer
 
 After generating a report bundle, create and open a standalone explorer with:
