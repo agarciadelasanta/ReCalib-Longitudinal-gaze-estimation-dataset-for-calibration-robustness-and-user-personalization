@@ -282,7 +282,13 @@ def build_html(report: dict, source_name: str) -> str:
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px; margin-top: 12px;
     }
-    .panel { min-width: 0; padding: 16px; }
+    .panel { position: relative; min-width: 0; padding: 16px; }
+    .panel-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+    .panel-heading h2 { margin: 0; }
+    .help-button { display: inline-grid; place-items: center; width: 21px; height: 21px; padding: 0; border: 1px solid var(--border); border-radius: 50%; color: var(--text); background: transparent; font: 500 .78rem/1 system-ui, sans-serif; cursor: help; }
+    .help-button:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .help-popup { position: absolute; z-index: 10; top: 48px; left: 16px; right: 16px; visibility: hidden; opacity: 0; padding: 10px 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); font-size: .84rem; line-height: 1.4; transition: opacity .12s ease; }
+    .help-button:hover + .help-popup, .help-button:focus + .help-popup { visibility: visible; opacity: 1; }
     .wide { grid-column: 1 / -1; }
     .chart { width: 100%; min-height: 390px; }
     .heatmap { min-height: 570px; }
@@ -335,20 +341,20 @@ def build_html(report: dict, source_name: str) -> str:
 
   <section class="grid">
     <article class="panel wide">
-      <h2>Participant × participant matrix</h2>
+      <div class="panel-heading"><h2>Participant × participant matrix</h2><button class="help-button" type="button" aria-label="Explain participant comparison matrix" aria-describedby="help-matrix">?</button><div id="help-matrix" class="help-popup" role="tooltip">Each cell compares two participants for the selected family, KPI, task, and view. For distance estimates, zero means similar and larger means more different; smaller is not automatically better. <span id="matrix-threshold">The exploratory anomaly screen is median + 3×MAD.</span> Confirm candidates using their CI and q &lt; 0.05.</div></div>
       <div id="matrix-chart" class="chart heatmap" role="img" aria-label="Pairwise participant distance heatmap"></div>
       <p id="pair-selection" class="selection" aria-live="polite">Select a matrix cell to inspect a participant pair.</p>
     </article>
     <article class="panel">
-      <h2>Mean selected matrix value by participant</h2>
+      <div class="panel-heading"><h2>Mean selected matrix value by participant</h2><button class="help-button" type="button" aria-label="Explain participant ranking" aria-describedby="help-ranking">?</button><div id="help-ranking" class="help-popup" role="tooltip">Average pairwise distance for each participant. Lower values mean the participant is more typical of the cohort; higher values indicate broader separation. <span id="ranking-threshold">The exploratory anomaly screen is median + 3×MAD.</span> This is a screening rule, not a significance test.</div></div>
       <div id="ranking-chart" class="chart" role="img" aria-label="Participant mean distance ranking"></div>
     </article>
     <article class="panel">
-      <h2>Longitudinal session instability</h2>
+      <div class="panel-heading"><h2>Longitudinal session instability</h2><button class="help-button" type="button" aria-label="Explain longitudinal instability" aria-describedby="help-profile">?</button><div id="help-profile" class="help-popup" role="tooltip">Measures how much each participant changes across sessions. Lower means more repeatable sessions; higher means greater within-user drift. <span id="profile-threshold">The exploratory anomaly screen is median + 3×MAD.</span></div></div>
       <div id="profile-chart" class="chart" role="img" aria-label="Within-participant session instability"></div>
     </article>
     <article class="panel wide">
-      <h2>Calibration-to-test mismatch by session</h2>
+      <div class="panel-heading"><h2>Calibration-to-test mismatch by session</h2><button class="help-button" type="button" aria-label="Explain calibration-to-test mismatch" aria-describedby="help-mismatch">?</button><div id="help-mismatch" class="help-popup" role="tooltip">Compares calibration samples with test samples inside the same session. Lower means the two phases are statistically closer; higher suggests a session-level mismatch that may complicate calibration. <span id="mismatch-threshold">The exploratory anomaly screen is median + 3×MAD.</span></div></div>
       <div id="mismatch-chart" class="chart" role="img" aria-label="Calibration-to-test mismatch distributions"></div>
     </article>
     <article class="panel wide">
@@ -462,6 +468,35 @@ function summary(rows, statistic) {
   return { extreme, median };
 }
 
+function medianOf(values) {
+  const sorted = values.filter(isNumber).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function updateThreshold(target, values, statistic = "estimate") {
+  const element = document.getElementById(target);
+  if (["p_value", "q_value"].includes(statistic)) {
+    element.textContent = statistic === "q_value"
+      ? "Use q < 0.05 as the conventional FDR-adjusted evidence threshold; do not use a high-value anomaly cutoff."
+      : "Use p < 0.05 only as unadjusted evidence and confirm with q < 0.05; do not average p-values to declare anomalies.";
+    return;
+  }
+  if (statistic !== "estimate") {
+    element.textContent = "A confidence-bound value alone has no anomaly cutoff; interpret it together with the estimate and q-value.";
+    return;
+  }
+  const valid = values.filter(isNumber);
+  const center = medianOf(valid);
+  const mad = center === null ? null : medianOf(valid.map(value => Math.abs(value - center)));
+  if (center === null || mad === null || mad <= 1e-12) {
+    element.textContent = "A median + 3×MAD screening cutoff cannot be estimated for the current selection.";
+    return;
+  }
+  element.textContent = `Current exploratory cutoff: values above ${formatValue(center + 3 * mad)} (median + 3×MAD).`;
+}
+
 function pairDetailParts(row, statistic) {
   const parts = [`${statisticLabel(statistic)} ${formatValue(row[statistic])}`];
   if (statistic !== "estimate" && isNumber(row.estimate)) parts.push(`Estimate ${formatValue(row.estimate)}`);
@@ -473,6 +508,7 @@ function pairDetailParts(row, statistic) {
 
 function renderMatrix(rows) {
   const statistic = statisticFilter.value;
+  updateThreshold("matrix-threshold", rows.map(row => row[statistic]), statistic);
   const significance = ["p_value", "q_value"].includes(statistic);
   document.getElementById("extreme-pair-label").textContent = significance
     ? "Smallest participant pair" : "Largest participant pair";
@@ -537,6 +573,7 @@ function renderRanking(rows) {
   const ranking = [...values.entries()].map(([user, items]) => ({
     user, value: items.reduce((sum, item) => sum + item, 0) / items.length
   })).sort((a, b) => a.value - b.value);
+  updateThreshold("ranking-threshold", ranking.map(row => row.value), statistic);
   if (!ranking.length) { renderEmpty("ranking-chart", "No participant ranking is available."); return; }
   Plotly.react("ranking-chart", [{
     type: "bar", orientation: "h",
@@ -554,6 +591,7 @@ function renderProfiles() {
   const rows = PROFILES.filter(row => row.family === familyFilter.value
     && row.task_type === taskFilter.value && row.view === viewFilter.value);
   const medianRows = rows.filter(row => row.metric === "longitudinal_instability_median").sort((a, b) => a.user_id.localeCompare(b.user_id));
+  updateThreshold("profile-threshold", medianRows.map(row => row.estimate));
   const iqrMap = new Map(rows.filter(row => row.metric === "longitudinal_instability_iqr").map(row => [row.user_id, row.estimate]));
   if (!medianRows.length) { renderEmpty("profile-chart", "Longitudinal profiles are unavailable for this selection."); return; }
   Plotly.react("profile-chart", [{
@@ -571,6 +609,7 @@ function renderProfiles() {
 function renderMismatch() {
   const rows = MISMATCH.filter(row => row.family === familyFilter.value
     && row.metric === metricFilter.value && row.aggregation === "session" && isNumber(row.estimate));
+  updateThreshold("mismatch-threshold", rows.map(row => row.estimate));
   if (!rows.length) { renderEmpty("mismatch-chart", "Calibration/test mismatch is unavailable for this KPI."); return; }
   const users = unique(rows.map(row => row.user_id));
   const colors = theme();

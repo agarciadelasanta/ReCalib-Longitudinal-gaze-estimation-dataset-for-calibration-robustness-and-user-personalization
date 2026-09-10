@@ -9,6 +9,7 @@ from typing import Sequence
 from .core import AnalysisConfig, FEATURE_COLUMNS
 from .comparison import DATASET_COMPARISON_FAMILIES, compare_csvs
 from .reporting import analyze_csv
+from .progress import progress_enabled
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -58,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bootstrap confidence level in (0, 1) (default: 0.95).",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
     return parser
 
 
@@ -113,6 +115,7 @@ def build_compare_parser() -> argparse.ArgumentParser:
         help="Bootstrap confidence level in (0, 1) (default: 0.95).",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
     return parser
 
 
@@ -138,14 +141,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = parser.parse_args(argv[1:])
         config = _config_from_args(args, parser)
         try:
-            manifest = compare_csvs(
-                args.csv_a,
-                args.csv_b,
-                args.output,
-                config,
-                label_a=args.name_a,
-                label_b=args.name_b,
-            )
+            with progress_enabled(not args.no_progress):
+                manifest = compare_csvs(
+                    args.csv_a,
+                    args.csv_b,
+                    args.output,
+                    config,
+                    label_a=args.name_a,
+                    label_b=args.name_b,
+                )
         except (FileNotFoundError, ValueError) as error:
             parser.error(str(error))
         print(
@@ -165,7 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     config = _config_from_args(args, parser)
     try:
-        manifest = analyze_csv(args.csv, args.output, config)
+        with progress_enabled(not args.no_progress):
+            manifest = analyze_csv(args.csv, args.output, config)
     except (FileNotFoundError, ValueError) as error:
         parser.error(str(error))
     print(

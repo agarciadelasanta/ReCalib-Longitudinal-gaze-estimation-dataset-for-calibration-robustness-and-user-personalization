@@ -316,8 +316,24 @@ for the statistical interpretation and inferential workflow.
 The current ReCalib-versus-Targets findings are explained in
 [docs/recalib_targets_comparison_interpretation.md](docs/recalib_targets_comparison_interpretation.md).
 
-See [docs/statistical_analysis.md](docs/statistical_analysis.md) for metric
-definitions, the inferential workflow, the output schema, and limitations.
+See [docs/statistical_analysis.md](docs/statistical_analysis.md) for commands and
+report structure, and
+[docs/statistical_analysis_methods.md](docs/statistical_analysis_methods.md) for
+the exact methods, statistical units, formulas, inference, and limitations.
+The final participant-variability and calibration/test conclusions are in
+[docs/statistical_analysis_explorer_conclusions.md](docs/statistical_analysis_explorer_conclusions.md).
+
+To validate and correct the effective screen dimensions stored in all
+`dataset_summary_*.csv` files, first run a dry check and then apply it:
+
+```powershell
+python -m statistical_analysis.fix_summary_screen_dimensions
+python -m statistical_analysis.fix_summary_screen_dimensions --apply
+```
+
+The apply command validates that every POG coordinate fits the configured
+`2736 x 1824` space, creates `.bak` copies, and atomically updates the original
+CSVs. Use `--no-backup` only when separate recoverable copies already exist.
 
 ## ⚖️ Evaluation Framework
 

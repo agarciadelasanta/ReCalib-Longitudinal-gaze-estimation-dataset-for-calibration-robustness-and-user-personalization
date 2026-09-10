@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .progress import progress, stage
 from .core import (
     AnalysisConfig,
     FEATURE_COLUMNS,
@@ -273,7 +274,7 @@ def _bootstrap_dataset_intervals(
     if iterations <= 0:
         return {}
     samples: dict[str, list[float]] = {}
-    for _ in range(iterations):
+    for _ in progress(range(iterations), "Dataset bootstrap", unit="draw"):
         users_a = _aggregate_user_units(
             _resample_sessions_within_users(session_units_a, rng),
             _DATASET_A,
@@ -361,6 +362,7 @@ def compare_frames(
         raise ValueError("Dataset labels must be different")
     _assert_comparison_schema(frame_a, frame_b, config)
 
+    stage("Preparing dataset comparison...")
     accepted_a = _prepare_accepted_frame(frame_a, config, require_task_type=False)
     accepted_b = _prepare_accepted_frame(frame_b, config, require_task_type=False)
     if accepted_a.empty or accepted_b.empty:
@@ -369,7 +371,7 @@ def compare_frames(
     rng = np.random.default_rng(config.random_seed)
     distance_rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []
-    for family in config.feature_families:
+    for family in progress(config.feature_families, "Comparing features", unit="family"):
         columns = list(FEATURE_COLUMNS[family])
         complete_a = accepted_a.dropna(subset=columns)
         complete_b = accepted_b.dropna(subset=columns)
@@ -378,7 +380,7 @@ def compare_frames(
             for view in config.views
             if not (family == "target_coverage" and view == "target_conditioned")
         )
-        for view in family_views:
+        for view in progress(family_views, family, unit="view"):
             conditioned = view == "target_conditioned"
             session_units_a = _describe_units(
                 complete_a, columns, conditioned=conditioned
@@ -538,6 +540,7 @@ def _read_summary(path: Path) -> pd.DataFrame:
         "task_id": "string",
         "sample_id": "string",
     }
+    stage(f"Reading {path}...")
     return pd.read_csv(path, dtype=identity_dtypes, low_memory=False)
 
 
@@ -576,6 +579,7 @@ def compare_csvs(
         label_a=resolved_label_a,
         label_b=resolved_label_b,
     )
+    stage(f"Writing comparison report to {output_dir}...")
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = {
         "dataset_distances.csv": result.dataset_distances,

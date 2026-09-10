@@ -110,6 +110,14 @@ class StatisticalAnalysisExplorerTests(unittest.TestCase):
                 "95% confidence intervals and p/q values are unavailable",
                 explorer,
             )
+            self.assertIn(
+                'aria-label="Explain participant comparison matrix"', explorer
+            )
+            self.assertIn('id="matrix-threshold"', explorer)
+            self.assertIn('id="ranking-threshold"', explorer)
+            self.assertIn('id="profile-threshold"', explorer)
+            self.assertIn('id="mismatch-threshold"', explorer)
+            self.assertIn("median + 3×MAD", explorer)
 
 
 if __name__ == "__main__":

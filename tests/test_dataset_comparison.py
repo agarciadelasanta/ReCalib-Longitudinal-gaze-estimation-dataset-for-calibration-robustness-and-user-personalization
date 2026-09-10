@@ -328,6 +328,10 @@ class DatasetComparisonTests(unittest.TestCase):
                 "95% confidence intervals and p/q values are unavailable",
                 explorer,
             )
+            self.assertIn('aria-label="Explain location shift"', explorer)
+            self.assertIn('aria-label="Explain dependence shift"', explorer)
+            self.assertIn("no universal anomaly cutoff", explorer)
+            self.assertIn("q &lt; 0.05", explorer)
 
 
 if __name__ == "__main__":

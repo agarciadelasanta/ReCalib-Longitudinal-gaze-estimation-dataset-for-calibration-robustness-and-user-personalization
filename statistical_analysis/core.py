@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .progress import progress, stage
 from .metrics import compare_unit_sets, describe_samples, descriptor_scales
 
 
@@ -362,7 +363,7 @@ def _bootstrap_intervals(
     if iterations <= 0:
         return {}
     samples: dict[str, list[float]] = {}
-    for _ in range(iterations):
+    for _ in progress(range(iterations), "Bootstrap", unit="draw"):
         boot = pd.concat(
             [
                 _resample_user_sessions(units, user_a, rng),
@@ -405,7 +406,7 @@ def _permutation_p_values(
     n_left = pair.loc[pair["user_id"].eq(user_a), "_cluster"].nunique()
     exceedances = {metric: 0 for metric in observed}
     valid = {metric: 0 for metric in observed}
-    for _ in range(iterations):
+    for _ in progress(range(iterations), "Permutations", unit="shuffle"):
         shuffled = rng.permutation(len(clusters))
         left_clusters = {clusters[index] for index in shuffled[:n_left]}
         permuted = pair.copy()
@@ -567,13 +568,14 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
     """Analyze an in-memory ReCalib summary frame through one stable seam."""
 
     config = config or AnalysisConfig()
+    stage("Preparing individual analysis...")
     accepted = _prepare_accepted_frame(frame, config)
     rng = np.random.default_rng(config.random_seed)
     rows: list[dict[str, Any]] = []
     profile_rows: list[dict[str, Any]] = []
     raw_units: dict[tuple[str, str], pd.DataFrame] = {}
     for task_type, task_frame in accepted.groupby("task_type", sort=True):
-        for family in config.feature_families:
+        for family in progress(config.feature_families, f"Task {task_type}: features", unit="family"):
             columns = list(FEATURE_COLUMNS[family])
             complete = task_frame.dropna(subset=columns)
             session_counts = complete.groupby("user_id")["session_id"].nunique()
@@ -582,7 +584,7 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
                 view for view in config.views
                 if not (family == "target_coverage" and view == "target_conditioned")
             )
-            for view in family_views:
+            for view in progress(family_views, family, unit="view"):
                 if view == "raw":
                     units = _describe_units(complete, columns, conditioned=False)
                     raw_units[(family, str(task_type))] = units
@@ -608,7 +610,10 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
                 )
                 scales = descriptor_scales(units)
 
-                for user_a, user_b in combinations(users, 2):
+                for user_a, user_b in progress(
+                    combinations(users, 2), f"{family}/{view}: user pairs",
+                    total=len(users) * (len(users) - 1) // 2, unit="pair",
+                ):
                     estimates = _compare_users(
                         units,
                         user_a,
@@ -664,6 +669,7 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
             group_columns, sort=False, group_keys=False
         )["p_value"].apply(_fdr_bh)
 
+    stage("Computing calibration/test mismatch...")
     mismatch = pd.DataFrame(_calibration_test_rows(raw_units, config, rng))
 
     catalog = pd.DataFrame(

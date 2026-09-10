@@ -212,11 +212,12 @@ difference. Conversely, a large exploratory estimate with a wide interval may
 be important but uncertain. A conventional `q < 0.05` threshold can be used as
 a secondary flag, not as the definition of domain shift.
 
-The current `temp/statistical_analysis` report was generated with zero bootstrap
-and permutation iterations. Therefore, its explorer supports descriptive
-ranking only: confidence intervals, `p`, and `q` values are unavailable. The
-matrix-value filter exposes them automatically when an inferential report
-contains them.
+The final `temp/statistical_analysis_inference` report contains bootstrap
+confidence intervals, permutation p-values, and FDR-adjusted q-values. Its
+evidence-based findings are summarized in [ReCalib Statistical Analysis
+Explorer: final conclusions](statistical_analysis_explorer_conclusions.md).
+Reports generated with zero bootstrap or permutation iterations still support
+descriptive ranking only; their corresponding inferential fields remain empty.
 
 ## 8. A participant-investigation workflow
 
@@ -291,9 +292,6 @@ rerun, regenerate the explorer so it embeds the new results:
 ```powershell
 & C:\Users\irisbond\.conda\envs\mamu_data_curation\python.exe `
   visualization\explore_statistical_analysis.py `
-  --report-dir temp\statistical_analysis `
+  --report-dir temp\statistical_analysis_inference `
   --open
 ```
-
-For an inferential report, replace the report directory with its corresponding
-output path.
