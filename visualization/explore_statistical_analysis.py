@@ -71,9 +71,15 @@ def parse_args(argv=None):
     return args, parser
 
 
-def _read_csv(path: Path, identity_columns=()) -> pd.DataFrame:
+def _read_csv(path: Path, identity_columns=(), *, allow_empty=False) -> pd.DataFrame:
     dtypes = {column: "string" for column in identity_columns}
-    return pd.read_csv(path, dtype=dtypes, low_memory=False)
+    try:
+        return pd.read_csv(path, dtype=dtypes, low_memory=False)
+    except pd.errors.EmptyDataError:
+        if not allow_empty:
+            raise
+        # Optional analyses can produce a headerless CSV when no rows apply.
+        return pd.DataFrame()
 
 
 def read_report(report_dir: Path) -> dict:
@@ -85,10 +91,12 @@ def read_report(report_dir: Path) -> dict:
     profiles = _read_csv(
         report_dir / REQUIRED_FILES["profiles"],
         ("user_id",),
+        allow_empty=True,
     )
     mismatch = _read_csv(
         report_dir / REQUIRED_FILES["mismatch"],
         ("user_id", "session_id"),
+        allow_empty=True,
     )
     features = _read_csv(report_dir / REQUIRED_FILES["features"])
 

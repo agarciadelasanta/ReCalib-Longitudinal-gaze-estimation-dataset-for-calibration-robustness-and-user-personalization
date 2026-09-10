@@ -578,6 +578,9 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
         for family in progress(config.feature_families, f"Task {task_type}: features", unit="family"):
             columns = list(FEATURE_COLUMNS[family])
             complete = task_frame.dropna(subset=columns)
+            if complete.empty:
+                stage(f"Skipping {task_type}/{family}: no complete feature rows.")
+                continue
             session_counts = complete.groupby("user_id")["session_id"].nunique()
             sample_counts = complete.groupby("user_id").size()
             family_views = tuple(

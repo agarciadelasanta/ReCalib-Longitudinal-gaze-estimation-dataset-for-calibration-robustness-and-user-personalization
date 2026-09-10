@@ -119,6 +119,21 @@ class StatisticalAnalysisExplorerTests(unittest.TestCase):
             self.assertIn('id="mismatch-threshold"', explorer)
             self.assertIn("median + 3×MAD", explorer)
 
+            for filename, table in (
+                ("calibration_test_mismatch.csv", "mismatch"),
+                ("user_profiles.csv", "profiles"),
+            ):
+                with self.subTest(empty_table=table):
+                    path = report_dir / filename
+                    original = path.read_bytes()
+                    pd.DataFrame().to_csv(path, index=False)
+                    empty_report = read_report(report_dir)
+                    self.assertTrue(empty_report[table].empty)
+                    self.assertEqual(len(empty_report["pairwise"]), 1)
+                    self.assertIn("ReCalib Statistical Analysis Explorer",
+                                  build_html(empty_report, report_dir.name))
+                    path.write_bytes(original)
+
 
 if __name__ == "__main__":
     unittest.main()

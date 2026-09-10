@@ -64,6 +64,24 @@ def _rich_row(user, session, task_type, value):
 
 
 class AnalyzeFrameTests(unittest.TestCase):
+    def test_missing_feature_values_skip_only_affected_task_family(self):
+        rows = [
+            _rich_row(user, "00", task, value)
+            for task in ("9-point", "16-point")
+            for user, value in (("00", 1), ("01", 2))
+        ]
+        frame = pd.DataFrame(rows)
+        frame.loc[frame.task_type == "16-point", "qa_ear_left"] = float("nan")
+        result = analyze_frame(frame, AnalysisConfig(
+            feature_families=("head_rotation", "quality"),
+            bootstrap_iterations=0, permutation_iterations=0,
+        ))
+        pairs = result.pairwise_distances
+        self.assertEqual(set(pairs[pairs.family == "head_rotation"].task_type),
+                         {"9-point", "16-point"})
+        self.assertEqual(set(pairs[pairs.family == "quality"].task_type), {"9-point"})
+        self.assertEqual(set(pairs.view), {"raw", "target_conditioned"})
+
     def test_configuration_rejects_invalid_inference_settings(self):
         with self.assertRaisesRegex(ValueError, "confidence_level"):
             AnalysisConfig(confidence_level=1.5)
