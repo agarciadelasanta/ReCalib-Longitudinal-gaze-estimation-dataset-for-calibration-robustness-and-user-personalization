@@ -38,6 +38,12 @@ FEATURE_COLUMNS = {
     ),
 }
 
+LANDMARK_FAMILIES = ("landmark_position", "landmark_scale", "landmark_shape")
+DEFAULT_FEATURE_FAMILIES = tuple(
+    family for family in FEATURE_COLUMNS if family not in LANDMARK_FAMILIES
+)
+LANDMARK_INPUT_COLUMNS = (*LANDMARK_SOURCE_COLUMNS, "img_res_width", "img_res_height")
+
 FEATURE_SOURCES = {
     "target_coverage": ("pog_px_x", "pog_px_y"),
     "head_rotation": FEATURE_COLUMNS["head_rotation"],
@@ -45,9 +51,9 @@ FEATURE_SOURCES = {
     "gaze_origin": FEATURE_COLUMNS["gaze_origin"],
     "gaze_point": ("gaze_pog_x", "gaze_pog_y"),
     "head_translation": FEATURE_COLUMNS["head_translation"],
-    "landmark_position": LANDMARK_SOURCE_COLUMNS,
-    "landmark_scale": LANDMARK_SOURCE_COLUMNS,
-    "landmark_shape": LANDMARK_SOURCE_COLUMNS,
+    "landmark_position": LANDMARK_INPUT_COLUMNS,
+    "landmark_scale": LANDMARK_INPUT_COLUMNS,
+    "landmark_shape": LANDMARK_INPUT_COLUMNS,
     "quality": FEATURE_COLUMNS["quality"],
 }
 
@@ -58,9 +64,9 @@ FEATURE_NOTES = {
     "gaze_point": "Screen-plane gaze point in millimetres; constant z excluded.",
     "head_rotation": "Joint Euler-angle head rotation in radians.",
     "head_translation": "Three-dimensional head translation in millimetres.",
-    "landmark_position": "Centroid of the selected facial landmarks in pixels.",
-    "landmark_scale": "RMS landmark radius around the facial centroid in pixels.",
-    "landmark_shape": "Landmarks centered and divided by RMS facial scale.",
+    "landmark_position": "Centroid of facial landmarks normalized by per-sample image width and height.",
+    "landmark_scale": "RMS radius around the facial centroid in image-normalized coordinates.",
+    "landmark_shape": "Image-normalized landmarks centered and divided by RMS facial scale.",
     "quality": "Joint quality-assurance measurements in native units.",
 }
 
@@ -85,7 +91,7 @@ def _metric_method(family: str, metric: str) -> str:
 class AnalysisConfig:
     """Configuration for the public in-memory analysis interface."""
 
-    feature_families: tuple[str, ...] = tuple(FEATURE_COLUMNS)
+    feature_families: tuple[str, ...] = DEFAULT_FEATURE_FAMILIES
     views: tuple[str, ...] = ("target_conditioned", "raw")
     bootstrap_iterations: int = 500
     permutation_iterations: int = 1_000
@@ -181,6 +187,13 @@ def _prepare_accepted_frame(
     if any(family.startswith("landmark_") for family in config.feature_families):
         landmark_values = accepted[list(LANDMARK_SOURCE_COLUMNS)].to_numpy(float)
         points = landmark_values.reshape(len(accepted), len(LANDMARK_IDS), 2)
+        dimensions = accepted[["img_res_width", "img_res_height"]].to_numpy(float)
+        if not (np.isfinite(dimensions) & (dimensions > 0)).all():
+            raise ValueError(
+                "Landmark analysis requires finite, positive img_res_width and "
+                "img_res_height for every accepted sample"
+            )
+        points = points / dimensions[:, None, :]
         centers = np.nanmean(points, axis=1)
         centered = points - centers[:, None, :]
         scales = np.sqrt(np.nanmean(np.sum(centered**2, axis=2), axis=1))

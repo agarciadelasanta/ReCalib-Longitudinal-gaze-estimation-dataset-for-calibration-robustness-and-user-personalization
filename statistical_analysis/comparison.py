@@ -14,6 +14,7 @@ from .progress import progress, stage
 from .core import (
     AnalysisConfig,
     FEATURE_COLUMNS,
+    LANDMARK_FAMILIES,
     FEATURE_NOTES,
     FEATURE_SOURCES,
     _compare_users,
@@ -30,6 +31,9 @@ _DATASET_A = "__dataset_a__"
 _DATASET_B = "__dataset_b__"
 DATASET_COMPARISON_FAMILIES = tuple(
     family for family in FEATURE_COLUMNS if family != "quality"
+)
+DEFAULT_COMPARISON_FAMILIES = tuple(
+    family for family in DATASET_COMPARISON_FAMILIES if family not in LANDMARK_FAMILIES
 )
 _EXCLUDED_AUDIT_COLUMNS = {"discard_info", "discard_reason"}
 
@@ -88,6 +92,15 @@ def _assert_comparison_schema(
 
 
 def _dataset_metadata(frame: pd.DataFrame, accepted: pd.DataFrame) -> dict[str, Any]:
+    sessions_per_user = accepted.groupby("user_id")["session_id"].nunique()
+    samples_per_session = accepted.groupby(["user_id", "session_id"]).size()
+
+    def balance(values: pd.Series) -> dict[str, float]:
+        return {
+            "min": int(values.min()), "median": float(values.median()),
+            "max": int(values.max()), "mean": float(values.mean()),
+        }
+
     metadata = {
         "input_rows": int(len(frame)),
         "accepted_rows": int(len(accepted)),
@@ -96,6 +109,8 @@ def _dataset_metadata(frame: pd.DataFrame, accepted: pd.DataFrame) -> dict[str, 
         "user_sessions": int(
             accepted[["user_id", "session_id"]].drop_duplicates().shape[0]
         ),
+        "sessions_per_user": balance(sessions_per_user),
+        "samples_per_session": balance(samples_per_session),
     }
     if "task_type" in accepted:
         metadata["source_task_counts_not_used_for_stratification"] = {
@@ -349,7 +364,7 @@ def compare_frames(
     """
 
     config = config or AnalysisConfig(
-        feature_families=DATASET_COMPARISON_FAMILIES,
+        feature_families=DEFAULT_COMPARISON_FAMILIES,
         views=("raw",),
     )
     if "quality" in config.feature_families:
@@ -569,7 +584,7 @@ def compare_csvs(
         resolved_label_b = f"{resolved_label_b}_b"
 
     config = config or AnalysisConfig(
-        feature_families=DATASET_COMPARISON_FAMILIES,
+        feature_families=DEFAULT_COMPARISON_FAMILIES,
         views=("raw",),
     )
     result = compare_frames(

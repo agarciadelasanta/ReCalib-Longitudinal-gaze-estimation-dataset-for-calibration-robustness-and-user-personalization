@@ -92,8 +92,8 @@ def parse_complete_sample(json_path):
         "user_id": data.get("user_id"),
         "task_type": data.get("task_type"),
         
-        "pog_px_x": pog_px.get("x"),
-        "pog_px_y": pog_px.get("y"),
+        "pog_px_x": int(pog_px.get("x")) if pog_px.get("x") is not None else None,
+        "pog_px_y": int(pog_px.get("y")) if pog_px.get("y") is not None else None,
         
         "gaze_vector_x": g_vector[0] if len(g_vector) > 0 else None,
         "gaze_vector_y": g_vector[1] if len(g_vector) > 1 else None,
@@ -150,8 +150,8 @@ def parse_complete_sample(json_path):
     # 2. Dynamically unpack all 18 facial mesh landmark coordinates
     for lm_id in LANDMARK_IDS:
         lm_coords = mesh_2d.get(str(lm_id)) or [None, None]
-        row[f"lm_{lm_id}_x"] = lm_coords[0]
-        row[f"lm_{lm_id}_y"] = lm_coords[1]
+        row[f"lm_{lm_id}_x"] = int(lm_coords[0]) if lm_coords[0] is not None else None
+        row[f"lm_{lm_id}_y"] = int(lm_coords[1]) if lm_coords[1] is not None else None
 
     return row
 
