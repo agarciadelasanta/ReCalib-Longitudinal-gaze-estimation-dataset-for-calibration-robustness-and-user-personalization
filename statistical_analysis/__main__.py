@@ -6,8 +6,8 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-from .core import AnalysisConfig, FEATURE_COLUMNS
-from .comparison import DATASET_COMPARISON_FAMILIES, compare_csvs
+from .core import AnalysisConfig, FEATURE_COLUMNS, DEFAULT_FEATURE_FAMILIES, LANDMARK_FAMILIES
+from .comparison import DATASET_COMPARISON_FAMILIES, DEFAULT_COMPARISON_FAMILIES, compare_csvs
 from .reporting import analyze_csv
 from .progress import progress_enabled
 
@@ -30,8 +30,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--families",
         nargs="+",
         choices=tuple(FEATURE_COLUMNS),
-        default=tuple(FEATURE_COLUMNS),
-        help="Feature families to analyze (default: all usable families).",
+        default=DEFAULT_FEATURE_FAMILIES,
+        help="Feature families to analyze (default: non-landmark families).",
     )
     parser.add_argument(
         "--views",
@@ -59,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bootstrap confidence level in (0, 1) (default: 0.95).",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--include-landmarks", action="store_true",
+                        help="Add landmark position, scale, and shape using image-normalized coordinates.")
     parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
     return parser
 
@@ -86,8 +88,8 @@ def build_compare_parser() -> argparse.ArgumentParser:
         "--families",
         nargs="+",
         choices=DATASET_COMPARISON_FAMILIES,
-        default=DATASET_COMPARISON_FAMILIES,
-        help="Feature families to compare (default: all non-quality families).",
+        default=DEFAULT_COMPARISON_FAMILIES,
+        help="Feature families to compare (default: non-quality, non-landmark families).",
     )
     parser.add_argument(
         "--views",
@@ -115,6 +117,8 @@ def build_compare_parser() -> argparse.ArgumentParser:
         help="Bootstrap confidence level in (0, 1) (default: 0.95).",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--include-landmarks", action="store_true",
+                        help="Add landmark position, scale, and shape using image-normalized coordinates.")
     parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
     return parser
 
@@ -124,8 +128,11 @@ def _config_from_args(args: argparse.Namespace, parser: argparse.ArgumentParser)
         parser.error("--bootstrap and --permutations must be non-negative")
     if not 0.0 < args.confidence < 1.0:
         parser.error("--confidence must be between 0 and 1")
+    families = tuple(args.families)
+    if args.include_landmarks:
+        families = tuple(dict.fromkeys((*families, *LANDMARK_FAMILIES)))
     return AnalysisConfig(
-        feature_families=tuple(args.families),
+        feature_families=families,
         views=tuple(args.views),
         bootstrap_iterations=args.bootstrap,
         permutation_iterations=args.permutations,

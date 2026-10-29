@@ -315,7 +315,19 @@ class DatasetComparisonTests(unittest.TestCase):
             self.assertEqual(payload["report_type"], "independent_dataset_comparison")
 
             report = read_report(output)
+            self.assertEqual(report["manifest"]["metadata"]["dataset_a"]["sessions_per_user"],
+                             {"min": 2, "median": 2.0, "max": 2, "mean": 2.0})
+            self.assertEqual(report["manifest"]["metadata"]["dataset_a"]["samples_per_session"]["mean"], 1.0)
             explorer = build_html(report, output.name)
+            self.assertIn("Data used in the comparison", explorer)
+            self.assertIn("Feature completeness", explorer)
+            self.assertIn("Recording balance", explorer)
+            self.assertIn("0.00%", explorer)
+            self.assertNotIn("__DATA_USED__", explorer)
+            for dataset in ("dataset_a", "dataset_b"):
+                report["manifest"]["metadata"][dataset].pop("sessions_per_user")
+                report["manifest"]["metadata"][dataset].pop("samples_per_session")
+            self.assertIn("Not recorded", build_html(report, output.name))
             self.assertIn("Independent Dataset Domain-Gap Explorer", explorer)
             self.assertIn("location-chart", explorer)
             self.assertIn('"metric":"location_shift"', explorer)

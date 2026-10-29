@@ -29,6 +29,8 @@ def _row(user, session, task_type, value, *, discarded=False):
         "head_rot_y": 0.0,
         "head_rot_z": 0.0,
         "discarded": discarded,
+        "img_res_width": 640,
+        "img_res_height": 480,
     }
 
 
@@ -290,7 +292,7 @@ class AnalyzeFrameTests(unittest.TestCase):
         self.assertTrue(first["q_value"].between(0.0, 1.0).all())
         self.assertTrue((first["q_value"] >= first["p_value"]).all())
 
-    def test_default_analysis_covers_every_usable_feature_family(self):
+    def test_default_analysis_excludes_landmark_families(self):
         rows = [
             _rich_row(user, session, task_type, value)
             for user, value in (("00", 0.0), ("01", 2.0))
@@ -309,9 +311,6 @@ class AnalyzeFrameTests(unittest.TestCase):
             "gaze_point",
             "head_rotation",
             "head_translation",
-            "landmark_position",
-            "landmark_scale",
-            "landmark_shape",
             "quality",
         }
         self.assertEqual(set(result.feature_catalog["family"]), expected)
@@ -319,10 +318,6 @@ class AnalyzeFrameTests(unittest.TestCase):
         distribution_methods = result.pairwise_distances.query(
             "metric == 'distribution_shift'"
         ).groupby("family")["metric_method"].first()
-        self.assertEqual(
-            distribution_methods["landmark_scale"],
-            "normalized_wasserstein_1",
-        )
         self.assertEqual(
             distribution_methods["head_rotation"],
             "robust_scaled_energy_distance",
