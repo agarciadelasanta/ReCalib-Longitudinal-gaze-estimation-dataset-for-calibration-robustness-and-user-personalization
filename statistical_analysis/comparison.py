@@ -13,16 +13,19 @@ import pandas as pd
 from .progress import progress, stage
 from .core import (
     AnalysisConfig,
+    ETH_FILTER_COLUMN,
     FEATURE_COLUMNS,
     LANDMARK_FAMILIES,
-    FEATURE_NOTES,
-    FEATURE_SOURCES,
     _compare_users,
     _describe_units,
     _fdr_bh,
     _metric_method,
     _permutation_p_values,
     _prepare_accepted_frame,
+    exclusion_counts,
+    feature_columns,
+    feature_note,
+    feature_sources,
 )
 from .metrics import METRICS, descriptor_scales
 
@@ -70,10 +73,12 @@ def _assert_comparison_schema(
     config: AnalysisConfig,
 ) -> None:
     required = {"user_id", "session_id", "discarded"}
+    if config.label_set == "eth":
+        required.add(ETH_FILTER_COLUMN)
     for family in config.feature_families:
-        if family not in FEATURE_SOURCES:
+        if family not in FEATURE_COLUMNS:
             raise ValueError(f"Unknown feature family: {family}")
-        required.update(FEATURE_SOURCES[family])
+        required.update(feature_sources(family, config.label_set))
     if "target_conditioned" in config.views:
         required.update({"pog_px_x", "pog_px_y"})
 
@@ -91,7 +96,9 @@ def _assert_comparison_schema(
     )
 
 
-def _dataset_metadata(frame: pd.DataFrame, accepted: pd.DataFrame) -> dict[str, Any]:
+def _dataset_metadata(
+    frame: pd.DataFrame, accepted: pd.DataFrame, label_set: str = "recalib"
+) -> dict[str, Any]:
     sessions_per_user = accepted.groupby("user_id")["session_id"].nunique()
     samples_per_session = accepted.groupby(["user_id", "session_id"]).size()
 
@@ -104,7 +111,7 @@ def _dataset_metadata(frame: pd.DataFrame, accepted: pd.DataFrame) -> dict[str, 
     metadata = {
         "input_rows": int(len(frame)),
         "accepted_rows": int(len(accepted)),
-        "discarded_rows_excluded": int(len(frame) - len(accepted)),
+        **exclusion_counts(frame, accepted, label_set),
         "users": int(accepted["user_id"].nunique()),
         "user_sessions": int(
             accepted[["user_id", "session_id"]].drop_duplicates().shape[0]
@@ -129,7 +136,7 @@ def _column_compatibility(
 ) -> pd.DataFrame:
     source_to_families: dict[str, list[str]] = {}
     for family in config.feature_families:
-        for column in FEATURE_SOURCES[family]:
+        for column in feature_sources(family, config.label_set):
             source_to_families.setdefault(column, []).append(family)
     if "target_conditioned" in config.views:
         source_to_families.setdefault("pog_px_x", []).append("target_conditioning")
@@ -148,7 +155,9 @@ def _column_compatibility(
         present_a = column in columns_a
         present_b = column in columns_b
         families = sorted(set(source_to_families.get(column, [])))
-        if column in {"user_id", "session_id", "discarded"}:
+        if column in {"user_id", "session_id", "discarded"} or (
+            config.label_set == "eth" and column == ETH_FILTER_COLUMN
+        ):
             role = "comparison_structure"
         elif column in {"task_id", "task_type"}:
             role = "source_task_metadata_not_used"
@@ -334,13 +343,13 @@ def _catalog(config: AnalysisConfig) -> pd.DataFrame:
             {
                 "family": family,
                 "dimensions": len(FEATURE_COLUMNS[family]),
-                "source_columns": ",".join(FEATURE_SOURCES[family]),
+                "source_columns": ",".join(feature_sources(family, config.label_set)),
                 "supported_views": (
                     "raw"
                     if family == "target_coverage"
                     else ",".join(config.views)
                 ),
-                "notes": FEATURE_NOTES[family],
+                "notes": feature_note(family, config.label_set),
             }
             for family in config.feature_families
         ]
@@ -387,7 +396,7 @@ def compare_frames(
     distance_rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []
     for family in progress(config.feature_families, "Comparing features", unit="family"):
-        columns = list(FEATURE_COLUMNS[family])
+        columns = list(feature_columns(family, config.label_set))
         complete_a = accepted_a.dropna(subset=columns)
         complete_b = accepted_b.dropna(subset=columns)
         family_views = tuple(
@@ -526,8 +535,9 @@ def compare_frames(
 
     return DatasetComparisonResult(
         metadata={
-            "dataset_a": {"label": label_a, **_dataset_metadata(frame_a, accepted_a)},
-            "dataset_b": {"label": label_b, **_dataset_metadata(frame_b, accepted_b)},
+            "label_set": config.label_set,
+            "dataset_a": {"label": label_a, **_dataset_metadata(frame_a, accepted_a, config.label_set)},
+            "dataset_b": {"label": label_b, **_dataset_metadata(frame_b, accepted_b, config.label_set)},
             "comparison_unit": "user",
             "session_weighting": "equal_within_user",
             "user_weighting": "equal_within_dataset",

@@ -457,5 +457,89 @@ class AnalyzeFrameTests(unittest.TestCase):
             self.assertTrue((output_path / "manifest.json").exists())
 
 
+def _eth_frame():
+    """Rich rows whose ETH columns copy the released labels; one extra row per task fails ETH."""
+
+    rows = []
+    for task in ("9-point", "16-point"):
+        for user, session, value in (
+            ("00", "00", 1), ("00", "01", 3), ("01", "00", 2), ("01", "01", 5),
+        ):
+            for offset in range(3):
+                row = _rich_row(user, session, task, value + offset)
+                row.update(
+                    eth_ok=1,
+                    eth_label_x=row["gaze_vector_x"],
+                    eth_label_y=row["gaze_vector_y"],
+                    eth_label_z=row["gaze_vector_z"],
+                    eth_face_center_x=row["gaze_origin_x"],
+                    eth_face_center_y=row["gaze_origin_y"],
+                    eth_face_center_z=row["gaze_origin_z"],
+                )
+                rows.append(row)
+        failed = _rich_row("00", "00", task, 1_000)
+        failed.update(eth_ok=0)
+        rows.append(failed)
+    return pd.DataFrame(rows)
+
+
+class ETHLabelSetTests(unittest.TestCase):
+    def test_eth_labels_reproduce_recalib_results_on_identical_values(self):
+        frame = _eth_frame()
+        families = ("gaze_direction", "gaze_origin", "gaze_point")
+        settings = dict(views=("raw",), bootstrap_iterations=0, permutation_iterations=0)
+        recalib = analyze_frame(
+            frame[frame.eth_ok.eq(1)],
+            AnalysisConfig(feature_families=families, **settings),
+        )
+        eth = analyze_frame(
+            frame, AnalysisConfig(feature_families=families, label_set="eth", **settings)
+        )
+
+        self.assertEqual(eth.metadata["label_set"], "eth")
+        self.assertEqual(eth.metadata["eth_unavailable_rows_excluded"], 2)
+        self.assertEqual(eth.metadata["accepted_rows"], recalib.metadata["accepted_rows"])
+        pd.testing.assert_frame_equal(eth.pairwise_distances, recalib.pairwise_distances)
+        pd.testing.assert_frame_equal(eth.user_profiles, recalib.user_profiles)
+        sources = eth.feature_catalog.set_index("family")["source_columns"]
+        self.assertEqual(sources["gaze_direction"], "eth_label_x,eth_label_y,eth_label_z")
+        self.assertEqual(
+            sources["gaze_origin"], "eth_face_center_x,eth_face_center_y,eth_face_center_z"
+        )
+
+    def test_eth_labels_reject_head_pose_and_missing_columns(self):
+        with self.assertRaisesRegex(ValueError, "head_rotation"):
+            AnalysisConfig(feature_families=("head_rotation",), label_set="eth")
+        with self.assertRaisesRegex(ValueError, "label_set"):
+            AnalysisConfig(label_set="other")
+        frame = pd.DataFrame([_rich_row("00", "00", "9-point", 1)])
+        with self.assertRaisesRegex(ValueError, "eth_label_x"):
+            analyze_frame(frame, AnalysisConfig(
+                feature_families=("gaze_direction",), label_set="eth",
+                bootstrap_iterations=0, permutation_iterations=0,
+            ))
+
+    def test_command_line_eth_defaults_skip_head_pose(self):
+        with TemporaryDirectory() as directory:
+            input_path = Path(directory) / "summary.csv"
+            output_path = Path(directory) / "report"
+            _eth_frame().to_csv(input_path, index=False)
+            completed = subprocess.run(
+                [
+                    sys.executable, "-m", "statistical_analysis", str(input_path),
+                    "--output", str(output_path), "--labels", "eth", "--views", "raw",
+                    "--bootstrap", "0", "--permutations", "0", "--no-progress",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            families = set(pd.read_csv(output_path / "feature_catalog.csv")["family"])
+            self.assertNotIn("head_rotation", families)
+            self.assertNotIn("head_translation", families)
+            self.assertIn("gaze_direction", families)
+
+
 if __name__ == "__main__":
     unittest.main()

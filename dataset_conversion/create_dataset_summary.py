@@ -93,10 +93,81 @@ def parse_sample(json_path, setup):
     return row
 
 
+ETH_COLUMNS = {  # eth_xgaze_labels.csv column -> summary column
+    "ok": "eth_ok", "fail_reason": "eth_fail_reason", "pred_pitch": "eth_pred_pitch", "pred_yaw": "eth_pred_yaw",
+    "pred_vec_x": "eth_pred_vec_x", "pred_vec_y": "eth_pred_vec_y", "pred_vec_z": "eth_pred_vec_z",
+    "face_center_x": "eth_face_center_x", "face_center_y": "eth_face_center_y", "face_center_z": "eth_face_center_z",
+    "label_eth_x": "eth_label_x", "label_eth_y": "eth_label_y", "label_eth_z": "eth_label_z",
+    "ang_err_eth_deg": "eth_ang_err_deg", "pog_pred_x_mm": "eth_pog_pred_x_mm", "pog_pred_y_mm": "eth_pog_pred_y_mm",
+    "pog_err_mm": "eth_pog_err_mm",
+}
+
+
+def add_eth_labels(rows, eth_csv, setup, tol_mm=0.5):
+    """Append ETH-XGaze baseline columns, matched on (user, session, task, image index).
+
+    The baseline uses only the image, the intrinsics and the stimulus point, so its outputs do
+    not depend on the head-pose/gaze labels. Each match is checked by comparing the baseline's
+    stimulus point (pog_gt_*_mm) with the one derived from the sample's pog_px.
+    """
+    scr, pos = setup["screen"], setup["camera"]["position_mm"]
+    eth = {}
+    with open(eth_csv, newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            idx = int(r["image"].rsplit("_img-", 1)[1].split(".")[0])
+            eth[(r["user"], r["session"], r["task"], idx)] = r
+    def task_key(row):
+        return row["user_id"], row["session_id"], row["task_id"]
+
+    def assign(row, r):
+        for src, col in ETH_COLUMNS.items():
+            row[col] = r[src] if r[src] != "" else None
+        row["eth_available"] = True
+
+    # pass 1: rows with a stimulus point are checked frame by frame
+    matched = mismatched = 0
+    task_ok, task_bad, pending = set(), set(), []
+    for row in rows:
+        for col in ETH_COLUMNS.values():
+            row[col] = None
+        row["eth_available"] = False
+        r = eth.get((*task_key(row), int(row["sample_id"])))
+        if r is None:
+            continue
+        if r["pog_gt_x_mm"] == "":          # baseline failure (no landmarks): nothing to check
+            pending.append((row, r))
+            continue
+        # stimulus point from pog_px (screen px, origin top-left) in camera mm, as standardize_release
+        x_mm = scr["width_mm"] / 2 - row["pog_px_x"] * scr["width_mm"] / scr["width_px"] + pos["x"]
+        y_mm = pos["y"] + row["pog_px_y"] * scr["height_mm"] / scr["height_px"]
+        if abs(float(r["pog_gt_x_mm"]) - x_mm) > tol_mm or abs(float(r["pog_gt_y_mm"]) - y_mm) > tol_mm:
+            mismatched += 1
+            task_bad.add(task_key(row))
+            continue
+        assign(row, r)
+        task_ok.add(task_key(row))
+        matched += 1
+
+    # pass 2: failure rows are accepted only in tasks whose other frames all matched
+    failures = rejected_failures = 0
+    for row, r in pending:
+        if task_key(row) in task_ok and task_key(row) not in task_bad:
+            assign(row, r)
+            failures += 1
+        else:
+            rejected_failures += 1
+    print(f"ETH-XGaze labels: {len(eth)} rows in {eth_csv.name}; matched {matched} samples (checked "
+          f"frame by frame) + {failures} baseline failures (task-level check); rejected {mismatched} "
+          f"(stimulus point differs > {tol_mm} mm) + {rejected_failures} failures in unverified tasks; "
+          f"{len(rows) - matched - failures} samples without baseline output")
+    return mismatched
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True, type=Path, help="release root (contains setup.json and user_XX)")
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--eth-csv", type=Path, help="ETH-XGaze baseline labels (eth_xgaze_labels.csv) to append")
     ap.add_argument("--workers", type=int, default=(os.cpu_count() or 4) * 2)
     args = ap.parse_args()
 
@@ -107,9 +178,14 @@ def main():
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         rows = [r for r in ex.map(lambda p: parse_sample(p, setup), files, chunksize=256) if r]
 
+    fieldnames = list(FIELDNAMES)
+    if args.eth_csv:
+        add_eth_labels(rows, args.eth_csv, setup)
+        fieldnames += ["eth_available"] + list(ETH_COLUMNS.values())
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=FIELDNAMES)
+        w = csv.DictWriter(fh, fieldnames=fieldnames)
         w.writeheader()
         w.writerows(rows)
     kept = sum(not r["discarded"] for r in rows)

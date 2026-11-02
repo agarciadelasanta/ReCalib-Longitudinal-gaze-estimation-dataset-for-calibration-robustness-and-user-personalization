@@ -198,6 +198,9 @@ def build_html(report: dict, source_name: str) -> str:
         ["family", "dimensions", "supported_views", "notes"],
     )
     metadata = report["manifest"].get("metadata", {})
+    label_set = {"recalib": "ReCalib labels", "eth": "ETH-XGaze labels"}.get(
+        str(metadata.get("label_set", "recalib")), str(metadata.get("label_set"))
+    )
 
     template = r"""<!doctype html>
 <html lang="en">
@@ -328,7 +331,7 @@ def build_html(report: dict, source_name: str) -> str:
       <h1>ReCalib Statistical Analysis Explorer</h1>
       <p>Pairwise domain distances, longitudinal variability, and calibration/test mismatch.</p>
     </div>
-    <p class="note">Source: __SOURCE_NAME__ · __ACCEPTED__ accepted samples · __USERS__ users · __SESSIONS__ sessions</p>
+    <p class="note">Source: __SOURCE_NAME__ · __LABEL_SET__ · __ACCEPTED__ accepted samples · __USERS__ users · __SESSIONS__ sessions</p>
   </header>
 
   <section class="controls" aria-label="Statistical result filters">
@@ -699,6 +702,7 @@ update();
     return (
         template.replace("__PLOTLY_JS__", get_plotlyjs())
         .replace("__SOURCE_NAME__", html.escape(source_name))
+        .replace("__LABEL_SET__", html.escape(label_set))
         .replace("__ACCEPTED__", f"{int(metadata.get('accepted_rows', 0)):,}")
         .replace("__USERS__", str(metadata.get("users", "—")))
         .replace("__SESSIONS__", str(metadata.get("user_sessions", "—")))

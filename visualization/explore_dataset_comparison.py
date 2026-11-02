@@ -104,6 +104,9 @@ def build_html(report: dict, source_name: str) -> str:
     meta_b = metadata.get("dataset_b", {})
     label_a = str(meta_a.get("label", "dataset A"))
     label_b = str(meta_b.get("label", "dataset B"))
+    label_set = {"recalib": "ReCalib labels", "eth": "ETH-XGaze labels"}.get(
+        str(metadata.get("label_set", "recalib")), str(metadata.get("label_set"))
+    )
     template = r"""<!doctype html>
 <html lang="en">
 <head>
@@ -162,7 +165,7 @@ def build_html(report: dict, source_name: str) -> str:
 <main>
   <header>
     <div><h1>__LABEL_A__ vs __LABEL_B__</h1><p>Independent-dataset, session-balanced domain-gap vector</p></div>
-    <p class="note">__A_SAMPLES__ / __B_SAMPLES__ accepted samples · __A_SESSIONS__ / __B_SESSIONS__ sessions</p>
+    <p class="note">__LABEL_SET__ · __A_SAMPLES__ / __B_SAMPLES__ accepted samples · __A_SESSIONS__ / __B_SESSIONS__ sessions</p>
   </header>
   <section class="controls" aria-label="Dataset comparison filters">
     <label>View<select id="view-filter"></select></label>
@@ -260,6 +263,7 @@ update();
         template.replace("__PLOTLY__", get_plotlyjs())
         .replace("__LABEL_A__", html.escape(label_a))
         .replace("__LABEL_B__", html.escape(label_b))
+        .replace("__LABEL_SET__", html.escape(label_set))
         .replace("__A_SAMPLES__", f"{int(meta_a.get('accepted_rows', 0)):,}")
         .replace("__B_SAMPLES__", f"{int(meta_b.get('accepted_rows', 0)):,}")
         .replace("__A_SESSIONS__", str(meta_a.get("user_sessions", "—")))

@@ -38,6 +38,32 @@ run high-resolution inference for the families needed in a final analysis.
 
 Use `python -m statistical_analysis --help` for every option.
 
+## ETH-XGaze label set
+
+`--labels eth` reruns the same analysis (KPIs, resampling, matrices, explorer)
+on the ETH-XGaze baseline columns appended by
+`dataset_conversion/create_dataset_summary.py --eth-csv`. The default,
+`--labels recalib`, keeps the released labels.
+
+| Family | `recalib` | `eth` |
+| --- | --- | --- |
+| `gaze_direction` | `gaze_vector_*` | `eth_label_*` (ETH face centre to target) |
+| `gaze_origin` | `gaze_origin_*` | `eth_face_center_*` |
+| `head_rotation`, `head_translation` | released head pose | not available |
+| other families | unchanged | unchanged |
+
+With `eth`, only non-discarded rows with `eth_ok == 1` are analysed, so every
+family uses the same samples; `manifest.json` reports the excluded rows as
+`eth_unavailable_rows_excluded`. The ETH predictions (`eth_pred_*`) and errors
+are not analysed. `run_statistical_analysis.sh` runs both label sets with
+`LABELS="recalib eth"` and writes the ETH reports to `*_eth` directories.
+
+```bash
+python -m statistical_analysis dataset_summary_recalib.csv \
+  --output temp/statistical_analysis_eth \
+  --labels eth
+```
+
 To compare two CSV files as independent datasets, use the separate workflow in
 [Comparing Two Independent Dataset CSVs](independent_dataset_comparison.md).
 
