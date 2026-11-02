@@ -426,7 +426,8 @@ function refreshDependentControls() {
   const family = familyFilter.value;
   const familyRows = PAIRS.filter(row => row.family === family);
   setOptions(metricFilter, unique(familyRows.map(row => row.metric)), metricFilter.value || "distribution_shift");
-  setOptions(taskFilter, unique(familyRows.map(row => row.task_type)), taskFilter.value || "16-point");
+  const tasks = unique(familyRows.map(row => row.task_type));
+  setOptions(taskFilter, tasks, taskFilter.value || (tasks.includes("test") ? "test" : "16-point"));
   setOptions(viewFilter, unique(familyRows.map(row => row.view)), viewFilter.value || "target_conditioned");
   const availableStatistics = statisticColumns.filter(column => familyRows.some(row => isNumber(row[column])));
   setOptions(statisticFilter, availableStatistics, statisticFilter.value || "estimate", statisticLabel);

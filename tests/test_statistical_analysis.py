@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 
-from statistical_analysis import AnalysisConfig, analyze_csv, analyze_frame
+from statistical_analysis import AnalysisConfig, analyze_csv, analyze_frame, compare_label_sets
 
 
 LANDMARK_IDS = (
@@ -366,6 +366,29 @@ class AnalyzeFrameTests(unittest.TestCase):
         self.assertAlmostEqual(mismatch["00"], 0.0)
         self.assertGreater(mismatch["01"], mismatch["00"])
 
+    def test_calibration_test_mismatch_accepts_release_task_names(self):
+        rows = [
+            _row(user, session, release_name, value + (5.0 if user == "01" and task_type == "16-point" else 0.0))
+            for user in ("00", "01")
+            for session in ("00", "01")
+            for task_type, release_name in (("9-point", "calibration"), ("16-point", "test"))
+            for value in (0.0, 1.0, 2.0)
+        ]
+        result = analyze_frame(
+            pd.DataFrame(rows),
+            AnalysisConfig(
+                feature_families=("head_rotation",),
+                views=("raw",),
+                bootstrap_iterations=0,
+                permutation_iterations=0,
+            ),
+        )
+        mismatch = result.calibration_test_mismatch.query(
+            "aggregation == 'user_equal_session_mean' and metric == 'location_shift'"
+        ).set_index("user_id")["estimate"]
+        self.assertAlmostEqual(mismatch["00"], 0.0)
+        self.assertGreater(mismatch["01"], mismatch["00"])
+
     def test_csv_report_writes_long_tables_manifest_and_symmetric_matrices(self):
         rows = [
             _row(user, session, task_type, value)
@@ -516,6 +539,34 @@ class ETHLabelSetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "eth_label_x"):
             analyze_frame(frame, AnalysisConfig(
                 feature_families=("gaze_direction",), label_set="eth",
+                bootstrap_iterations=0, permutation_iterations=0,
+            ))
+
+    def test_label_comparison_uses_only_samples_with_both_labels(self):
+        frame = _eth_frame()
+        missing = frame.index[frame.eth_ok.eq(1)][0]
+        frame.loc[missing, "gaze_vector_x"] = float("nan")
+        result = compare_label_sets(frame, AnalysisConfig(
+            feature_families=("gaze_direction", "gaze_origin"), views=("raw",),
+            bootstrap_iterations=0, permutation_iterations=0,
+        ))
+
+        self.assertEqual(result.metadata["label_set"], "recalib_vs_eth")
+        self.assertEqual(result.metadata["common_rows"], len(frame) - 3)
+        self.assertEqual(
+            result.metadata["dataset_a"]["accepted_rows"],
+            result.metadata["dataset_b"]["accepted_rows"],
+        )
+        estimates = result.dataset_distances.set_index(["family", "metric"])["estimate"]
+        self.assertAlmostEqual(estimates[("gaze_direction", "location_shift")], 0.0)
+        self.assertAlmostEqual(estimates[("gaze_origin", "location_shift")], 0.0)
+        sources = result.feature_catalog.set_index("family")["source_columns"]
+        self.assertIn("B: eth_label_x", sources["gaze_direction"])
+
+    def test_label_comparison_rejects_families_without_both_labels(self):
+        with self.assertRaisesRegex(ValueError, "both systems"):
+            compare_label_sets(_eth_frame(), AnalysisConfig(
+                feature_families=("gaze_point",), views=("raw",),
                 bootstrap_iterations=0, permutation_iterations=0,
             ))
 

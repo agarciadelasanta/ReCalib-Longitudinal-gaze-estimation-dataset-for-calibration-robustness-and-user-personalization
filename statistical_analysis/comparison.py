@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 import json
 from pathlib import Path
 from typing import Any
@@ -13,9 +13,11 @@ import pandas as pd
 from .progress import progress, stage
 from .core import (
     AnalysisConfig,
+    ETH_FEATURE_SOURCES,
     ETH_FILTER_COLUMN,
     FEATURE_COLUMNS,
     LANDMARK_FAMILIES,
+    _accepted_mask,
     _compare_users,
     _describe_units,
     _fdr_bh,
@@ -39,6 +41,8 @@ DEFAULT_COMPARISON_FAMILIES = tuple(
     family for family in DATASET_COMPARISON_FAMILIES if family not in LANDMARK_FAMILIES
 )
 _EXCLUDED_AUDIT_COLUMNS = {"discard_info", "discard_reason"}
+# Families labelled by both the ReCalib and the ETH-XGaze label sets.
+LABEL_COMPARISON_FAMILIES = tuple(ETH_FEATURE_SOURCES)
 
 
 def _excluded_from_comparison_audit(column: str) -> bool:
@@ -67,11 +71,7 @@ class DatasetComparisonManifest:
     metadata: dict[str, Any]
 
 
-def _assert_comparison_schema(
-    frame_a: pd.DataFrame,
-    frame_b: pd.DataFrame,
-    config: AnalysisConfig,
-) -> None:
+def _required_columns(config: AnalysisConfig) -> set[str]:
     required = {"user_id", "session_id", "discarded"}
     if config.label_set == "eth":
         required.add(ETH_FILTER_COLUMN)
@@ -81,9 +81,17 @@ def _assert_comparison_schema(
         required.update(feature_sources(family, config.label_set))
     if "target_conditioned" in config.views:
         required.update({"pog_px_x", "pog_px_y"})
+    return required
 
-    missing_a = sorted(required - set(frame_a.columns))
-    missing_b = sorted(required - set(frame_b.columns))
+
+def _assert_comparison_schema(
+    frame_a: pd.DataFrame,
+    frame_b: pd.DataFrame,
+    config_a: AnalysisConfig,
+    config_b: AnalysisConfig,
+) -> None:
+    missing_a = sorted(_required_columns(config_a) - set(frame_a.columns))
+    missing_b = sorted(_required_columns(config_b) - set(frame_b.columns))
     if not missing_a and not missing_b:
         return
     details = []
@@ -133,11 +141,14 @@ def _column_compatibility(
     accepted_a: pd.DataFrame,
     accepted_b: pd.DataFrame,
     config: AnalysisConfig,
+    label_set_b: str,
 ) -> pd.DataFrame:
+    label_sets = {config.label_set, label_set_b}
     source_to_families: dict[str, list[str]] = {}
     for family in config.feature_families:
-        for column in feature_sources(family, config.label_set):
-            source_to_families.setdefault(column, []).append(family)
+        for label_set in label_sets:
+            for column in feature_sources(family, label_set):
+                source_to_families.setdefault(column, []).append(family)
     if "target_conditioned" in config.views:
         source_to_families.setdefault("pog_px_x", []).append("target_conditioning")
         source_to_families.setdefault("pog_px_y", []).append("target_conditioning")
@@ -156,7 +167,7 @@ def _column_compatibility(
         present_b = column in columns_b
         families = sorted(set(source_to_families.get(column, [])))
         if column in {"user_id", "session_id", "discarded"} or (
-            config.label_set == "eth" and column == ETH_FILTER_COLUMN
+            "eth" in label_sets and column == ETH_FILTER_COLUMN
         ):
             role = "comparison_structure"
         elif column in {"task_id", "task_type"}:
@@ -337,19 +348,28 @@ def _target_set(units: pd.DataFrame) -> set[tuple[float, float]]:
     )
 
 
-def _catalog(config: AnalysisConfig) -> pd.DataFrame:
+def _catalog(config: AnalysisConfig, label_set_b: str) -> pd.DataFrame:
+    def per_dataset(value_a: str, value_b: str) -> str:
+        return value_a if value_a == value_b else f"A: {value_a} | B: {value_b}"
+
     return pd.DataFrame(
         [
             {
                 "family": family,
                 "dimensions": len(FEATURE_COLUMNS[family]),
-                "source_columns": ",".join(feature_sources(family, config.label_set)),
+                "source_columns": per_dataset(
+                    ",".join(feature_sources(family, config.label_set)),
+                    ",".join(feature_sources(family, label_set_b)),
+                ),
                 "supported_views": (
                     "raw"
                     if family == "target_coverage"
                     else ",".join(config.views)
                 ),
-                "notes": feature_note(family, config.label_set),
+                "notes": per_dataset(
+                    feature_note(family, config.label_set),
+                    feature_note(family, label_set_b),
+                ),
             }
             for family in config.feature_families
         ]
@@ -363,6 +383,7 @@ def compare_frames(
     *,
     label_a: str = "dataset_a",
     label_b: str = "dataset_b",
+    label_set_b: str | None = None,
 ) -> DatasetComparisonResult:
     """Compare two independent datasets without pairing users or samples.
 
@@ -370,12 +391,15 @@ def compare_frames(
     within each user, and users receive equal weight within each dataset. For
     the target-conditioned view, comparisons are calculated at targets present
     in both datasets and then averaged equally across those common targets.
+    ``config.label_set`` applies to dataset A; ``label_set_b`` (default: the
+    same) to dataset B.
     """
 
     config = config or AnalysisConfig(
         feature_families=DEFAULT_COMPARISON_FAMILIES,
         views=("raw",),
     )
+    config_b = replace(config, label_set=label_set_b or config.label_set)
     if "quality" in config.feature_families:
         raise ValueError(
             "The quality family is excluded from independent-dataset comparisons"
@@ -384,11 +408,11 @@ def compare_frames(
         raise ValueError("Dataset labels must not be empty")
     if label_a == label_b:
         raise ValueError("Dataset labels must be different")
-    _assert_comparison_schema(frame_a, frame_b, config)
+    _assert_comparison_schema(frame_a, frame_b, config, config_b)
 
     stage("Preparing dataset comparison...")
     accepted_a = _prepare_accepted_frame(frame_a, config, require_task_type=False)
-    accepted_b = _prepare_accepted_frame(frame_b, config, require_task_type=False)
+    accepted_b = _prepare_accepted_frame(frame_b, config_b, require_task_type=False)
     if accepted_a.empty or accepted_b.empty:
         raise ValueError("Both datasets must contain at least one accepted sample")
 
@@ -396,9 +420,10 @@ def compare_frames(
     distance_rows: list[dict[str, Any]] = []
     coverage_rows: list[dict[str, Any]] = []
     for family in progress(config.feature_families, "Comparing features", unit="family"):
-        columns = list(feature_columns(family, config.label_set))
-        complete_a = accepted_a.dropna(subset=columns)
-        complete_b = accepted_b.dropna(subset=columns)
+        columns_a = list(feature_columns(family, config.label_set))
+        columns_b = list(feature_columns(family, config_b.label_set))
+        complete_a = accepted_a.dropna(subset=columns_a)
+        complete_b = accepted_b.dropna(subset=columns_b)
         family_views = tuple(
             view
             for view in config.views
@@ -407,10 +432,10 @@ def compare_frames(
         for view in progress(family_views, family, unit="view"):
             conditioned = view == "target_conditioned"
             session_units_a = _describe_units(
-                complete_a, columns, conditioned=conditioned
+                complete_a, columns_a, conditioned=conditioned
             ) if not complete_a.empty else pd.DataFrame()
             session_units_b = _describe_units(
-                complete_b, columns, conditioned=conditioned
+                complete_b, columns_b, conditioned=conditioned
             ) if not complete_b.empty else pd.DataFrame()
 
             units_a = _aggregate_user_units(
@@ -535,9 +560,21 @@ def compare_frames(
 
     return DatasetComparisonResult(
         metadata={
-            "label_set": config.label_set,
-            "dataset_a": {"label": label_a, **_dataset_metadata(frame_a, accepted_a, config.label_set)},
-            "dataset_b": {"label": label_b, **_dataset_metadata(frame_b, accepted_b, config.label_set)},
+            "label_set": (
+                config.label_set
+                if config.label_set == config_b.label_set
+                else f"{config.label_set}_vs_{config_b.label_set}"
+            ),
+            "dataset_a": {
+                "label": label_a,
+                "label_set": config.label_set,
+                **_dataset_metadata(frame_a, accepted_a, config.label_set),
+            },
+            "dataset_b": {
+                "label": label_b,
+                "label_set": config_b.label_set,
+                **_dataset_metadata(frame_b, accepted_b, config_b.label_set),
+            },
             "comparison_unit": "user",
             "session_weighting": "equal_within_user",
             "user_weighting": "equal_within_dataset",
@@ -552,9 +589,9 @@ def compare_frames(
         dataset_distances=distances,
         comparison_coverage=pd.DataFrame(coverage_rows),
         column_compatibility=_column_compatibility(
-            frame_a, frame_b, accepted_a, accepted_b, config
+            frame_a, frame_b, accepted_a, accepted_b, config, config_b.label_set
         ),
-        feature_catalog=_catalog(config),
+        feature_catalog=_catalog(config, config_b.label_set),
     )
 
 
@@ -604,6 +641,16 @@ def compare_csvs(
         label_a=resolved_label_a,
         label_b=resolved_label_b,
     )
+    return _write_comparison_report(result, input_a, input_b, output_dir, config)
+
+
+def _write_comparison_report(
+    result: DatasetComparisonResult,
+    input_a: Path,
+    input_b: Path,
+    output_dir: Path,
+    config: AnalysisConfig,
+) -> DatasetComparisonManifest:
     stage(f"Writing comparison report to {output_dir}...")
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = {
@@ -634,4 +681,76 @@ def compare_csvs(
         output_dir=str(output_dir),
         files=tuple(files),
         metadata=result.metadata,
+    )
+
+
+def common_label_mask(frame: pd.DataFrame, families: tuple[str, ...]) -> pd.Series:
+    """Rows usable under both label sets: accepted for ETH and complete in both."""
+
+    mask = _accepted_mask(frame, "eth")
+    for family in families:
+        for label_set in ("recalib", "eth"):
+            mask &= frame[list(feature_sources(family, label_set))].notna().all(axis=1)
+    return mask
+
+
+def compare_label_sets(
+    frame: pd.DataFrame,
+    config: AnalysisConfig | None = None,
+) -> DatasetComparisonResult:
+    """Compare the ReCalib and ETH-XGaze labels of one dataset on their common samples.
+
+    Only the families both label sets provide (LABEL_COMPARISON_FAMILIES) are
+    compared, and only on rows that have both labels, so the two sides hold the
+    same samples. The comparison engine is the independent-dataset one: it does
+    not use the row pairing, which makes its permutation test conservative.
+    """
+
+    config = config or AnalysisConfig(
+        feature_families=LABEL_COMPARISON_FAMILIES, views=("raw",)
+    )
+    other = [f for f in config.feature_families if f not in LABEL_COMPARISON_FAMILIES]
+    if other:
+        raise ValueError(
+            "Label-set comparison only covers families labelled by both systems ("
+            + ", ".join(LABEL_COMPARISON_FAMILIES) + "); got " + ", ".join(other)
+        )
+    config = replace(config, label_set="recalib")
+    _assert_comparison_schema(frame, frame, config, replace(config, label_set="eth"))
+    common = frame.loc[common_label_mask(frame, config.feature_families)]
+    result = compare_frames(
+        common,
+        common,
+        config,
+        label_a="ReCalib labels",
+        label_b="ETH-XGaze labels",
+        label_set_b="eth",
+    )
+    result.metadata.update(
+        sample_scope="samples_with_both_label_sets",
+        input_rows=int(len(frame)),
+        common_rows=int(len(common)),
+        rows_without_both_labels_excluded=int(len(frame) - len(common)),
+        row_pairing="same_samples_in_both_label_sets_not_used_by_tests",
+    )
+    return result
+
+
+def compare_label_sets_csv(
+    input_path: str | Path,
+    output_dir: str | Path,
+    config: AnalysisConfig | None = None,
+) -> DatasetComparisonManifest:
+    """Compare ReCalib and ETH-XGaze labels of one CSV and write the report bundle."""
+
+    input_path = Path(input_path).expanduser().resolve()
+    output_dir = Path(output_dir).expanduser().resolve()
+    if not input_path.is_file():
+        raise FileNotFoundError(f"Input CSV does not exist: {input_path}")
+    config = config or AnalysisConfig(
+        feature_families=LABEL_COMPARISON_FAMILIES, views=("raw",)
+    )
+    result = compare_label_sets(_read_summary(input_path), config)
+    return _write_comparison_report(
+        result, input_path, input_path, output_dir, replace(config, label_set="recalib")
     )

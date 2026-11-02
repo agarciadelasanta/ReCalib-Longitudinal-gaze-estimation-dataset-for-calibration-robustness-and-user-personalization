@@ -87,6 +87,10 @@ ETH_FEATURE_NOTES = {
 }
 ETH_UNAVAILABLE_FAMILIES = ("head_rotation", "head_translation")
 ETH_FILTER_COLUMN = "eth_ok"
+# task_type names of the calibration and test tasks: released summaries use
+# "calibration"/"test", older ones "9-point"/"16-point".
+CALIBRATION_TASK_TYPES = ("calibration", "9-point")
+TEST_TASK_TYPES = ("test", "16-point")
 
 
 def feature_sources(family: str, label_set: str = "recalib") -> tuple[str, ...]:
@@ -585,6 +589,14 @@ def _longitudinal_profile_rows(
     return rows
 
 
+def _task_units(
+    raw_units: dict[tuple[str, str], pd.DataFrame],
+    family: str,
+    task_types: tuple[str, ...],
+) -> pd.DataFrame | None:
+    return next((raw_units[(family, task)] for task in task_types if (family, task) in raw_units), None)
+
+
 def _calibration_test_rows(
     raw_units: dict[tuple[str, str], pd.DataFrame],
     config: AnalysisConfig,
@@ -592,8 +604,8 @@ def _calibration_test_rows(
 ) -> list[dict[str, Any]]:
     rows = []
     for family in config.feature_families:
-        calibration = raw_units.get((family, "9-point"))
-        test = raw_units.get((family, "16-point"))
+        calibration = _task_units(raw_units, family, CALIBRATION_TASK_TYPES)
+        test = _task_units(raw_units, family, TEST_TASK_TYPES)
         if calibration is None or test is None:
             continue
         scales = descriptor_scales(pd.concat([calibration, test], ignore_index=True))

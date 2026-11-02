@@ -10,7 +10,11 @@ from .core import (
     AnalysisConfig, FEATURE_COLUMNS, DEFAULT_FEATURE_FAMILIES, LABEL_SETS, LANDMARK_FAMILIES,
     available_families,
 )
-from .comparison import DATASET_COMPARISON_FAMILIES, DEFAULT_COMPARISON_FAMILIES, compare_csvs
+from .comparison import (
+    DATASET_COMPARISON_FAMILIES, DEFAULT_COMPARISON_FAMILIES, LABEL_COMPARISON_FAMILIES,
+    compare_csvs, compare_label_sets_csv,
+)
+from .consistency import ConsistencyConfig, VECTOR_SOURCES, analyze_consistency_csv
 from .reporting import analyze_csv
 from .progress import progress_enabled
 
@@ -142,6 +146,86 @@ def build_compare_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def build_consistency_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m statistical_analysis consistency",
+        description=(
+            "Check whether gaze-vector label sets vary together within sessions "
+            "and across sessions, after removing each set's own offset."
+        ),
+    )
+    parser.add_argument("csv", type=Path, help="Dataset-summary CSV with the selected vector columns.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Directory for the gaze-consistency report bundle.",
+    )
+    parser.add_argument(
+        "--vectors",
+        nargs="+",
+        choices=tuple(VECTOR_SOURCES),
+        default=("recalib", "eth"),
+        help=(
+            "Gaze vectors to compare pairwise: 'recalib' (gaze_vector_*), 'eth' "
+            "(eth_label_*), 'eth_pred' (eth_pred_vec_*) (default: recalib eth)."
+        ),
+    )
+    parser.add_argument(
+        "--min-session-samples",
+        type=int,
+        default=100,
+        help="Drop sessions with fewer accepted samples carrying every vector (default: 100).",
+    )
+    parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=500,
+        help="Session-bootstrap iterations; use 0 to disable (default: 500).",
+    )
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        default=0.95,
+        help="Bootstrap confidence level in (0, 1) (default: 0.95).",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
+    return parser
+
+
+def build_compare_labels_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m statistical_analysis compare-labels",
+        description=(
+            "Compare the ReCalib and ETH-XGaze labels of one dataset-summary CSV "
+            "with the dataset-comparison KPIs, using only the label families both "
+            "systems provide and only the samples that have both labels."
+        ),
+    )
+    parser.add_argument("csv", type=Path, help="Dataset-summary CSV with ETH-XGaze columns.")
+    parser.add_argument("--output", type=Path, required=True,
+                        help="Directory for the comparison report bundle.")
+    parser.add_argument(
+        "--families",
+        nargs="+",
+        choices=LABEL_COMPARISON_FAMILIES,
+        help="Label families to compare (default: all of them).",
+    )
+    parser.add_argument("--views", nargs="+", choices=("target_conditioned", "raw"),
+                        default=("raw",), help="Analysis views (default: raw).")
+    parser.add_argument("--bootstrap", type=int, default=500,
+                        help="Session-bootstrap iterations; use 0 to disable (default: 500).")
+    parser.add_argument("--permutations", type=int, default=1_000,
+                        help="Whole-user permutation iterations; use 0 to disable (default: 1000).")
+    parser.add_argument("--confidence", type=float, default=0.95,
+                        help="Bootstrap confidence level in (0, 1) (default: 0.95).")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
+    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
+    parser.set_defaults(include_landmarks=False, labels="recalib")
+    return parser
+
+
 def _config_from_args(
     args: argparse.Namespace,
     parser: argparse.ArgumentParser,
@@ -193,6 +277,56 @@ def main(argv: Sequence[str] | None = None) -> int:
             json.dumps(
                 {
                     "report_type": "independent_dataset_comparison",
+                    "output_dir": manifest.output_dir,
+                    "files": len(manifest.files),
+                    "metadata": manifest.metadata,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    if argv and argv[0] == "compare-labels":
+        parser = build_compare_labels_parser()
+        args = parser.parse_args(argv[1:])
+        config = _config_from_args(args, parser, LABEL_COMPARISON_FAMILIES)
+        try:
+            with progress_enabled(not args.no_progress):
+                manifest = compare_label_sets_csv(args.csv, args.output, config)
+        except (FileNotFoundError, ValueError) as error:
+            parser.error(str(error))
+        print(
+            json.dumps(
+                {
+                    "report_type": "label_set_comparison",
+                    "output_dir": manifest.output_dir,
+                    "files": len(manifest.files),
+                    "metadata": manifest.metadata,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    if argv and argv[0] == "consistency":
+        parser = build_consistency_parser()
+        args = parser.parse_args(argv[1:])
+        try:
+            config = ConsistencyConfig(
+                vectors=tuple(args.vectors),
+                min_session_samples=args.min_session_samples,
+                bootstrap_iterations=args.bootstrap,
+                confidence_level=args.confidence,
+                random_seed=args.seed,
+            )
+            with progress_enabled(not args.no_progress):
+                manifest = analyze_consistency_csv(args.csv, args.output, config)
+        except (FileNotFoundError, ValueError) as error:
+            parser.error(str(error))
+        print(
+            json.dumps(
+                {
+                    "report_type": "gaze_consistency",
                     "output_dir": manifest.output_dir,
                     "files": len(manifest.files),
                     "metadata": manifest.metadata,

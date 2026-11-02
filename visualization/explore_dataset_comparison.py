@@ -104,7 +104,11 @@ def build_html(report: dict, source_name: str) -> str:
     meta_b = metadata.get("dataset_b", {})
     label_a = str(meta_a.get("label", "dataset A"))
     label_b = str(meta_b.get("label", "dataset B"))
-    label_set = {"recalib": "ReCalib labels", "eth": "ETH-XGaze labels"}.get(
+    label_set = {
+        "recalib": "ReCalib labels",
+        "eth": "ETH-XGaze labels",
+        "recalib_vs_eth": "samples with both labels",
+    }.get(
         str(metadata.get("label_set", "recalib")), str(metadata.get("label_set"))
     )
     template = r"""<!doctype html>

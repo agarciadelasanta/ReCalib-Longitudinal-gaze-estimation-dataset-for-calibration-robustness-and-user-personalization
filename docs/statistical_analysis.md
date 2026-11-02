@@ -64,6 +64,21 @@ python -m statistical_analysis dataset_summary_recalib.csv \
   --labels eth
 ```
 
+Each individual analysis uses every sample its label set has. To compare the
+two label sets with each other, `compare-labels` runs the dataset-comparison
+KPIs with the ReCalib labels as dataset A and the ETH-XGaze labels as dataset
+B, restricted to the families both systems label (`gaze_direction`,
+`gaze_origin`) and to the samples that have both labels, so both sides hold
+the same samples. The comparison engine does not use this row pairing, so its
+permutation test is conservative. The report opens in the dataset-comparison
+explorer.
+
+```bash
+python -m statistical_analysis compare-labels dataset_summary_recalib.csv \
+  --output temp/recalib_vs_eth_labels
+python visualization/explore_dataset_comparison.py --report-dir temp/recalib_vs_eth_labels
+```
+
 To compare two CSV files as independent datasets, use the separate workflow in
 [Comparing Two Independent Dataset CSVs](independent_dataset_comparison.md).
 
