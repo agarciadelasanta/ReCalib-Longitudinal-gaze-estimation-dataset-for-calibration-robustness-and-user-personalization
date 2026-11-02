@@ -5,6 +5,10 @@ flattened ReCalib sample metadata. It is intentionally independent of model
 predictions. Its outputs describe dataset variability; they do not claim that a
 particular difference causes model error or negative transfer.
 
+For the exact statistical units, formulas, resampling procedures, FDR scopes,
+and a description of every analysis used, see [Statistical analyses and
+methods](statistical_analysis_methods.md).
+
 ## Quick start
 
 Run the complete descriptive analysis without resampling:
@@ -34,6 +38,9 @@ run high-resolution inference for the families needed in a final analysis.
 
 Use `python -m statistical_analysis --help` for every option.
 
+To compare two CSV files as independent datasets, use the separate workflow in
+[Comparing Two Independent Dataset CSVs](independent_dataset_comparison.md).
+
 ## Interactive explorer
 
 After generating a report bundle, create and open a standalone explorer with:
@@ -61,6 +68,9 @@ when the corresponding inferential outputs contain values.
 
 See [How to Interpret the Statistical Analysis Explorer](statistical_analysis_explorer_interpretation.md)
 for a plot-by-plot reading guide and the main interpretation limitations.
+The conclusions from the final inferential ReCalib report are documented in
+[ReCalib Statistical Analysis Explorer: final
+conclusions](statistical_analysis_explorer_conclusions.md).
 
 ## Analysis population and hierarchy
 

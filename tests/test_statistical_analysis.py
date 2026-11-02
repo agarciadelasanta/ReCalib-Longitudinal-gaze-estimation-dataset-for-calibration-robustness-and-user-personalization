@@ -29,6 +29,8 @@ def _row(user, session, task_type, value, *, discarded=False):
         "head_rot_y": 0.0,
         "head_rot_z": 0.0,
         "discarded": discarded,
+        "img_res_width": 640,
+        "img_res_height": 480,
     }
 
 
@@ -64,6 +66,24 @@ def _rich_row(user, session, task_type, value):
 
 
 class AnalyzeFrameTests(unittest.TestCase):
+    def test_missing_feature_values_skip_only_affected_task_family(self):
+        rows = [
+            _rich_row(user, "00", task, value)
+            for task in ("9-point", "16-point")
+            for user, value in (("00", 1), ("01", 2))
+        ]
+        frame = pd.DataFrame(rows)
+        frame.loc[frame.task_type == "16-point", "qa_ear_left"] = float("nan")
+        result = analyze_frame(frame, AnalysisConfig(
+            feature_families=("head_rotation", "quality"),
+            bootstrap_iterations=0, permutation_iterations=0,
+        ))
+        pairs = result.pairwise_distances
+        self.assertEqual(set(pairs[pairs.family == "head_rotation"].task_type),
+                         {"9-point", "16-point"})
+        self.assertEqual(set(pairs[pairs.family == "quality"].task_type), {"9-point"})
+        self.assertEqual(set(pairs.view), {"raw", "target_conditioned"})
+
     def test_configuration_rejects_invalid_inference_settings(self):
         with self.assertRaisesRegex(ValueError, "confidence_level"):
             AnalysisConfig(confidence_level=1.5)
@@ -272,7 +292,7 @@ class AnalyzeFrameTests(unittest.TestCase):
         self.assertTrue(first["q_value"].between(0.0, 1.0).all())
         self.assertTrue((first["q_value"] >= first["p_value"]).all())
 
-    def test_default_analysis_covers_every_usable_feature_family(self):
+    def test_default_analysis_excludes_landmark_families(self):
         rows = [
             _rich_row(user, session, task_type, value)
             for user, value in (("00", 0.0), ("01", 2.0))
@@ -291,9 +311,6 @@ class AnalyzeFrameTests(unittest.TestCase):
             "gaze_point",
             "head_rotation",
             "head_translation",
-            "landmark_position",
-            "landmark_scale",
-            "landmark_shape",
             "quality",
         }
         self.assertEqual(set(result.feature_catalog["family"]), expected)
@@ -301,10 +318,6 @@ class AnalyzeFrameTests(unittest.TestCase):
         distribution_methods = result.pairwise_distances.query(
             "metric == 'distribution_shift'"
         ).groupby("family")["metric_method"].first()
-        self.assertEqual(
-            distribution_methods["landmark_scale"],
-            "normalized_wasserstein_1",
-        )
         self.assertEqual(
             distribution_methods["head_rotation"],
             "robust_scaled_energy_distance",
