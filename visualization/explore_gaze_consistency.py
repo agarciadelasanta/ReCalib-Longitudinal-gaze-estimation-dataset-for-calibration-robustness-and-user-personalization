@@ -217,6 +217,8 @@ function layout(xTitle, yTitle) { const c=theme(); return {paper_bgcolor:"rgba(0
 const plotConfig={responsive:true,displaylogo:false,modeBarButtonsToRemove:["lasso2d","select2d"]};
 const marker = () => ({color:theme().series,size:8,opacity:.75,line:{color:theme().panel,width:1}});
 const empty = target => { Plotly.purge(target); document.getElementById(target).innerHTML='<div class="empty">No values are available for this selection.</div>'; };
+// Purge before clearing: Plotly.react on a div whose children were removed draws into the detached old plot.
+const reset = target => { Plotly.purge(target); document.getElementById(target).innerHTML=""; };
 const selected = row => row.task_type===taskFilter.value && pairKey(row)===pairFilter.value;
 const names = () => { const [a,b]=pairFilter.value.split("|"); return [vectorLabel(a), vectorLabel(b)]; };
 
@@ -231,7 +233,7 @@ function renderSummary() {
   }
 }
 function renderUnits() {
-  const target="units-chart"; document.getElementById(target).innerHTML="";
+  const target="units-chart"; reset(target);
   const traces=[];
   for (const [level, view, text] of [...LEVELS].reverse()) {
     const rows=UNITS.filter(row=>selected(row)&&row.component===componentFilter.value&&row.level===level&&row.view===view&&isNumber(row.pearson_r));
@@ -245,7 +247,7 @@ function renderUnits() {
   Plotly.react(target,traces,base,plotConfig);
 }
 function renderDrift() {
-  const target="drift-chart"; document.getElementById(target).innerHTML="";
+  const target="drift-chart"; reset(target);
   const [a,b]=pairFilter.value.split("|"); const component=componentFilter.value;
   const rows=DEVIATIONS.filter(row=>row.task_type===taskFilter.value&&isNumber(row[`${a}_${component}`])&&isNumber(row[`${b}_${component}`]));
   if (!rows.length) return empty(target);
@@ -260,7 +262,7 @@ function renderDrift() {
   Plotly.react(target,[identity,points],base,plotConfig);
 }
 function renderOffsets() {
-  const target="offset-chart"; document.getElementById(target).innerHTML="";
+  const target="offset-chart"; reset(target);
   const component=componentFilter.value;
   const rows=OFFSETS.filter(row=>selected(row)&&isNumber(row[`mean_offset_${component}_deg`])).sort((p,q)=>String(p.user_id).localeCompare(String(q.user_id),undefined,{numeric:true})||String(p.session_id).localeCompare(String(q.session_id),undefined,{numeric:true}));
   if (!rows.length) return empty(target);

@@ -114,8 +114,13 @@ def add_eth_labels(rows, eth_csv, setup, tol_mm=0.5):
     eth = {}
     with open(eth_csv, newline="", encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
-            idx = int(r["image"].rsplit("_img-", 1)[1].split(".")[0])
-            eth[(r["user"], r["session"], r["task"], idx)] = r
+            # identifiers from the image name (UU_SS_TT_img-N.png): always present, unlike the
+            # user/session/task columns, which are empty for some failed baseline rows
+            ids, n = r["image"].rsplit("_img-", 1)
+            key = (*ids.split("_"), int(n.split(".")[0]))
+            if key in eth:
+                raise ValueError(f"{eth_csv.name}: sample {key} appears twice")
+            eth[key] = r
     def task_key(row):
         return row["user_id"], row["session_id"], row["task_id"]
 
@@ -148,17 +153,18 @@ def add_eth_labels(rows, eth_csv, setup, tol_mm=0.5):
         task_ok.add(task_key(row))
         matched += 1
 
-    # pass 2: failure rows are accepted only in tasks whose other frames all matched
+    # pass 2: failure rows carry no stimulus point to check; they are accepted on the image-name
+    # match (verified frame by frame for every row that has one), except in tasks with a mismatch
     failures = rejected_failures = 0
     for row, r in pending:
-        if task_key(row) in task_ok and task_key(row) not in task_bad:
+        if mismatched == 0 or task_key(row) not in task_bad:
             assign(row, r)
             failures += 1
         else:
             rejected_failures += 1
     print(f"ETH-XGaze labels: {len(eth)} rows in {eth_csv.name}; matched {matched} samples (checked "
-          f"frame by frame) + {failures} baseline failures (task-level check); rejected {mismatched} "
-          f"(stimulus point differs > {tol_mm} mm) + {rejected_failures} failures in unverified tasks; "
+          f"frame by frame) + {failures} baseline failures (matched by image name); rejected {mismatched} "
+          f"(stimulus point differs > {tol_mm} mm) + {rejected_failures} failures in tasks with a mismatch; "
           f"{len(rows) - matched - failures} samples without baseline output")
     return mismatched
 
