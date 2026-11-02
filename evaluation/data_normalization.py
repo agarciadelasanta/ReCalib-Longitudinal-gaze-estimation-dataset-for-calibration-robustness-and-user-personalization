@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 import cv2
-import dlib
 import h5py
 import numpy as np
 from tqdm import tqdm
-from imutils import face_utils
+
+from eth_xGaze_inf import load_camera_npz
 
 # --- CONFIGURATION ---
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -26,10 +26,6 @@ def gaze_vector_to_pitchyaw(v):
     pitch = -np.arcsin(v[1])
     yaw = np.arctan2(-v[0], -v[2])
     return np.array([pitch, yaw], dtype=np.float32)
-
-def load_camera_npz(npz_path):
-    data = np.load(npz_path)
-    return np.asarray(data["mtx"], dtype=np.float64), np.asarray(data["dist"], dtype=np.float64).reshape(-1, 1)
 
 def estimateHeadPose(landmarks_2d_6, facePts_3d_6, K, dist):
     _, rvec, tvec = cv2.solvePnP(facePts_3d_6, landmarks_2d_6, K, dist, flags=cv2.SOLVEPNP_EPNP)
@@ -64,6 +60,9 @@ def process_dataset():
     # Initialize skip counters
     n_skip = 0
     
+    import dlib  # only the fallback below needs it
+    from imutils import face_utils
+
     K, dist = load_camera_npz(CAMERA_NPZ)
     face_detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor(SHAPE_PREDICTOR)
@@ -120,14 +119,15 @@ def process_dataset():
 
                 if lmk_dict is not None:
                     try:
-                        # Map MediaPipe indices to 6 points: Left/Right eyes and nose
+                        # ETH 6-point order (same as dlib 36, 39, 42, 45, 31, 35), in image space:
+                        # left eye outer/inner, right eye inner/outer, left/right nose corner.
                         points = [
-                            lmk_dict["263"], # Left eye outer
-                            lmk_dict["362"], # Left eye inner
-                            lmk_dict["133"], # Right eye inner
-                            lmk_dict["33"],  # Right eye outer
-                            lmk_dict["129"], # Nose corner left
-                            lmk_dict["358"]  # Nose corner right
+                            lmk_dict["33"],  # Image-left eye outer
+                            lmk_dict["133"], # Image-left eye inner
+                            lmk_dict["362"], # Image-right eye inner
+                            lmk_dict["263"], # Image-right eye outer
+                            lmk_dict["129"], # Image-left nose corner
+                            lmk_dict["358"]  # Image-right nose corner
                         ]
                         landmarks_2d_6 = np.array(points, dtype=np.float64).reshape(6, 1, 2)
                     except KeyError:

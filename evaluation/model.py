@@ -3,9 +3,10 @@ import torch.nn as nn
 from modules import resnet50
 
 class gaze_network(nn.Module):
-    def __init__(self, use_face=False, num_glimpses=1):
+    def __init__(self, use_face=False, num_glimpses=1, pretrained=True):
         super(gaze_network, self).__init__()
-        self.gaze_network = resnet50(pretrained=True)
+        # Inference passes pretrained=False: the checkpoint overwrites the weights anyway.
+        self.gaze_network = resnet50(pretrained=pretrained)
 
         self.gaze_fc = nn.Sequential(
             nn.Linear(2048, 2),

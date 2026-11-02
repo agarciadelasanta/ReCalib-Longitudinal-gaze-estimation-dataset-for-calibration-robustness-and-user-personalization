@@ -19,7 +19,6 @@ DEFAULT_SHAPE_PREDICTOR = (
     REPO_ROOT / "evaluation" / "modules" / "shape_predictor_68_face_landmarks.dat"
 )
 DEFAULT_FACE_MODEL = Path(__file__).resolve().parent / "face_model.txt"
-DEFAULT_CAMERA_INTRINSICS = REPO_ROOT / "docs" / "camera_intrinsics.npz"
 
 
 def build_parser():
@@ -48,7 +47,7 @@ def build_parser():
         "--shape-predictor",
         type=Path,
         default=DEFAULT_SHAPE_PREDICTOR,
-        help="dlib 68-landmark model used with --checkpoint.",
+        help="dlib 68-landmark model used with --checkpoint (image-only landmarks).",
     )
     parser.add_argument(
         "--face-model",
@@ -59,8 +58,8 @@ def build_parser():
     parser.add_argument(
         "--camera-intrinsics",
         type=Path,
-        default=DEFAULT_CAMERA_INTRINSICS,
-        help="Camera intrinsics NPZ used with --checkpoint.",
+        default=None,
+        help="Camera intrinsics NPZ used with --checkpoint (default: docs/camera_intrinsics.npz).",
     )
     parser.add_argument(
         "--device",
@@ -84,13 +83,13 @@ def existing_path(parser, path, label):
 
 def create_estimator(args, parser):
     checkpoint = existing_path(parser, args.checkpoint, "checkpoint")
-    shape_predictor = existing_path(
-        parser, args.shape_predictor, "shape predictor"
-    )
+    shape_predictor = existing_path(parser, args.shape_predictor, "shape predictor")
     face_model = existing_path(parser, args.face_model, "face model")
-    camera_intrinsics = existing_path(
-        parser, args.camera_intrinsics, "camera intrinsics"
-    )
+    camera_intrinsics = None
+    if args.camera_intrinsics is not None:
+        camera_intrinsics = existing_path(
+            parser, args.camera_intrinsics, "camera intrinsics"
+        )
 
     evaluation_dir = REPO_ROOT / "evaluation"
     sys.path.insert(0, str(evaluation_dir))
@@ -106,7 +105,7 @@ def create_estimator(args, parser):
         shape_predictor_path=str(shape_predictor),
         face_model_path=str(face_model),
         ckpt_path=str(checkpoint),
-        camera_npz_path=str(camera_intrinsics),
+        camera_npz_path=str(camera_intrinsics) if camera_intrinsics else None,
         camera_xml_path=None,
         device=args.device,
     )
