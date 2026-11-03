@@ -187,7 +187,7 @@ This is the main utility for data inspection. It supports both ground-truth visu
 * **2D Inspection**: Generates a 2D image overlay in the screen coordinate system and an interactive 3D visualization of the gaze origin, vector, and head pose.
 * **Label Verification**: Renders all JSON metadata, including facial landmarks, eye ROIs, and 3D gaze rays.
 * **Inference Overlay**: Optionally accepts an ETH-XGaze checkpoint to compare predicted gaze vectors against ground-truth labels. Inference is disabled by default, so the bundled example does not require `dlib`, PyTorch, or a downloaded checkpoint.
-* **Input**: Uses `example/07_00_02_img-040.png` by default, or accepts an absolute or relative path to a `.png`/`.jpg` sample with a same-named `.json` file.
+* **Input**: Uses `example/07_00_02_img-0040.png` by default, or accepts an absolute or relative path to a `.png`/`.jpg` sample with a same-named `.json` file.
 * **Output**: 
     * **Interactive 3D**: A spatial representation of the camera-centered coordinate system.
     * **2D Screen**: Target and gaze intersection points mapped to the 2D display.
