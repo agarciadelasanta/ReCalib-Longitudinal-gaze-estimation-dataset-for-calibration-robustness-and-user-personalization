@@ -1,7 +1,9 @@
 """Compare the ReCalib labelling with the EVE ground truth (webcam_c).
 
-    python -m validation.eve_compare --frames-root H:/EVE/Mamu_unzipped --h5-root H:/EVE/Extracted_webcam_h5 \
+    python -m validation.eve_compare --frames-root H:/EVE/Mamu_untagged --h5-root H:/EVE/Extracted_webcam_h5 \
         --out H:/EVE/relabel_eval/eve_compare.csv [--stride 10] [--recordings train01/step040_...]
+
+Frames are read from <frames-root>/<recording>/webcam_c.zip, or from an extracted webcam_c/ folder.
 
 For each frame frame_N.jpg (row N of webcam_c.h5) with valid EVE eye positions and gaze target:
   - the target is EVE's face_PoG_tobii converted to camera mm with camera_transformation;
@@ -15,6 +17,7 @@ import argparse
 import csv
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 import cv2
@@ -60,8 +63,9 @@ def main(argv=None) -> int:
     ap.add_argument("--model")
     args = ap.parse_args(argv)
 
-    recs = args.recordings or sorted(str(p.parent.relative_to(args.frames_root).as_posix())
-                                     for p in args.frames_root.glob("*/*/webcam_c"))
+    recs = args.recordings or sorted({p.parent.relative_to(args.frames_root).as_posix()
+                                      for p in [*args.frames_root.glob("*/*/webcam_c"),
+                                                *args.frames_root.glob("*/*/webcam_c.zip")]})
     args.out.parent.mkdir(parents=True, exist_ok=True)
     dummy = {"camera": {"camera_matrix": np.eye(3).tolist(), "dist_coeffs_k1_k2_p1_p2_k3": [0] * 5}}
     n_ok = n_noface = 0
@@ -78,11 +82,19 @@ def main(argv=None) -> int:
                                           ("face_PoG_tobii", "left_o", "right_o", "face_o", "face_g_tobii", "face_R"))
                 valid = (h["face_PoG_tobii/validity"][()] & h["left_o/validity"][()] & h["right_o/validity"][()]
                          & h["face_o/validity"][()] & h["face_g_tobii/validity"][()])
+            zpath = args.frames_root / rec / "webcam_c.zip"
+            if zpath.exists():
+                zf = zipfile.ZipFile(zpath)
+                names = set(zf.namelist())
+                read = lambda name: cv2.imdecode(np.frombuffer(zf.read(name), np.uint8), cv2.IMREAD_COLOR)
+            else:
+                folder = args.frames_root / rec / "webcam_c"
+                names = {p.name for p in folder.glob("frame_*.jpg")}
+                read = lambda name: cv2.imread(str(folder / name))
             for i in range(0, len(pog), args.stride):
-                img = args.frames_root / rec / "webcam_c" / f"frame_{i}.jpg"
-                if not valid[i] or not img.exists():
+                if not valid[i] or f"frame_{i}.jpg" not in names:
                     continue
-                bgr = cv2.imread(str(img))
+                bgr = read(f"frame_{i}.jpg")
                 ours = our_origin(labeller, bgr, K)
                 if ours is None:
                     n_noface += 1

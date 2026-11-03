@@ -1,0 +1,16 @@
+{
+    "_note": "Fine-tuning settings per hyperparameter group. Fix them before any test task is scored (tune with validation folds and --no-test). The same settings are used by every scenario of a group.",
+    "domain": {
+        "lr": 1e-4, "weight_decay": 0.0, "epochs": 5, "batch_size": 50,
+        "lr_step": 3, "lr_gamma": 0.1, "freeze_bn": false
+    },
+    "personalization": {
+        "lr": 1e-4, "weight_decay": 0.0, "epochs": 5, "batch_size": 50,
+        "lr_step": 3, "lr_gamma": 0.1, "freeze_bn": false
+    },
+    "calibration": {
+        "lr": 1e-5, "weight_decay": 0.0, "epochs": 20, "batch_size": 32,
+        "lr_step": 15, "lr_gamma": 0.1, "freeze_bn": true
+    },
+    "eval_batch_size": 128
+}
