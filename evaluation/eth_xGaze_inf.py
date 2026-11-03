@@ -307,6 +307,6 @@ if __name__ == "__main__":
         shape_predictor_path=os.path.join(REPO_ROOT, "evaluation", "modules", "shape_predictor_68_face_landmarks.dat"),
         device="cpu",
     )
-    auxFileName = os.path.join(REPO_ROOT, "example", "07_00_02_img-040.png")
+    auxFileName = os.path.join(REPO_ROOT, "example", "07_00_02_img-0040.png")
     v = est.predict_gaze_vector(auxFileName)
     print("Gaze vector (camera frame):", v)
