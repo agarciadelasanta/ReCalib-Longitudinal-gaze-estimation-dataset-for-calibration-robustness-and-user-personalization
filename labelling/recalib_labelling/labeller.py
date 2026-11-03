@@ -63,13 +63,15 @@ class Labeller:
         self.close()
 
     def label(self, image: Union[str, Path, np.ndarray], pog_px: Sequence[float],
-              image_name: Optional[str] = None, ids: Optional[dict] = None) -> dict:
+              image_name: Optional[str] = None, ids: Optional[dict] = None, depth_scale: float = 1.0) -> dict:
         """Label one image.
 
-        image:  path or BGR array (as read by cv2.imread).
-        pog_px: screen target (x, y) in physical pixels of the screen described in setup.json.
-        ids:    optional identifiers copied to the output (user_id, session_id, task_id,
-                sample_id, task_type).
+        image:       path or BGR array (as read by cv2.imread).
+        pog_px:      screen target (x, y) in physical pixels of the screen described in setup.json.
+        ids:         optional identifiers copied to the output (user_id, session_id, task_id,
+                     sample_id, task_type).
+        depth_scale: per-user face-scale factor (see face_scale.py); scales the head position and
+                     gaze origin along their camera rays. 1.0 = MediaPipe's canonical face size.
         """
         if not isinstance(image, np.ndarray):
             image_name = image_name or Path(image).name
@@ -98,7 +100,9 @@ class Labeller:
 
         euler, rotvec, t_real, r_cam = head_pose_from_mediapipe(
             result.facial_transformation_matrixes[0], (w, h), self.camera_matrix, self.dist_coeffs)
-        origin = np.round(eye_midpoint_cam(r_cam, t_real), 4)
+        # a face s times larger at s times the distance projects identically: scale both together
+        origin = np.round(eye_midpoint_cam(r_cam, t_real) * depth_scale, 4)
+        t_real = t_real * depth_scale
         pog_mm = screen_target_mm(pog_px, self.setup)
         vector = (pog_mm - origin) / np.linalg.norm(pog_mm - origin)
 

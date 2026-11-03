@@ -24,7 +24,7 @@ Test sets are always the 16-point test tasks of the held-out session. Every scen
 
 Requirements: `pip install -r requirements.txt`, plus `evaluation/ckpt/epoch_24_ckpt.pth.tar` and `evaluation/modules/shape_predictor_68_face_landmarks.dat`. Run from the repo root.
 
-**1. Normalize the release once** (CPU, dlib; about 0.3 s per frame per worker):
+**1. Normalize the release once** (CPU, dlib on the full 1920×1080 image; about 2 s per frame per worker on a laptop CPU):
 
 ```bash
 python evaluation/prepare_protocol_h5.py /data/ReCalib --out /data/protocol.h5 --num-workers 16

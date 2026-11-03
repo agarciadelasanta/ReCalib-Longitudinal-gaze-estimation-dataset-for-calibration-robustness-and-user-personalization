@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .face_scale import RECALIB_FACTORS, load_factors
 from .labeller import Labeller
 
 
@@ -29,12 +30,14 @@ def main(argv=None) -> int:
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--model")
+    ap.add_argument("--depth-scale", type=Path, default=RECALIB_FACTORS, help="per-user face scale CSV")
     args = ap.parse_args(argv)
 
     root = args.release_root
     with open(root / "recalib_index.csv", newline="", encoding="utf-8") as fh:
         rows = [r for r in csv.DictReader(fh) if r["discard_code"] in ("0", "10")]   # samples with labels
     random.Random(args.seed).shuffle(rows)
+    factors = load_factors(args.depth_scale)
     rows = rows[: args.n]
 
     diffs = {k: [] for k in ("gaze.vector (deg)", "gaze.origin_mm (mm)", "gaze.pog_mm (mm)",
@@ -44,7 +47,8 @@ def main(argv=None) -> int:
     with Labeller(root / "setup.json", model_path=args.model) as labeller:
         for r in rows:
             ref = json.loads((root / r["image"]).with_suffix(".json").read_text(encoding="utf-8"))
-            new = labeller.label(root / r["image"], (float(r["pog_px_x"]), float(r["pog_px_y"])))
+            new = labeller.label(root / r["image"], (float(r["pog_px_x"]), float(r["pog_px_y"])),
+                                 depth_scale=factors.get(r["user_id"], 1.0))
             if new["gaze"] is None:
                 print(f"no face found in {r['image']} (released with labels)")
                 continue
