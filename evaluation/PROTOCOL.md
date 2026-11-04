@@ -12,7 +12,7 @@ Runs the reuse scenarios of the Usage Notes (Figure 5) with the public ETH-XGaze
 - Session calibration is needed if `personal → personal_calib` improves.
 - Session-to-session drift is the spread of a user's session errors.
 
-Test sets are always the 16-point test tasks of the held-out session. Every scenario fine-tunes the whole network in the same way (L1 loss on normalized pitch/yaw, Adam), with the settings of its group in `protocol_config.json`.
+Test sets are always the 16-point test tasks of the held-out session. Everything follows the official ETH-XGaze repository (github.com/xucong-zhang/ETH-XGaze): face detection with dlib's HOG detector (`get_frontal_face_detector`, upsampling 1), the 6 landmarks 36, 39, 42, 45, 31, 35, EPnP + iterative solvePnP with the ETH face model, normalization to 224×224 at 600 mm (focal 960), ImageNet input normalization, and fine-tuning with the defaults of its training code (Adam, lr 1e-4, batch 50, 25 epochs, StepLR every 10 epochs × 0.1, L1 loss on normalized pitch/yaw, whole network, BatchNorm in train mode; `protocol_config.json`). Only the camera intrinsics are ReCalib's, and training stops early: after 3 epochs without improvement of the validation error, keeping the best weights (at most the official 25 epochs). Validation never comes from the held-out session. For personalization it is one held-out training session of the user (its test tasks). For leave-one-user-out it is one held-out training user. For calibration it is 2 of the 9 calibration targets; the model is then retrained from its start weights on all 9 targets for the selected number of epochs. The one addition is the face-depth check below, which excludes frames instead of changing the method.
 
 ## Inputs and labels
 
@@ -38,7 +38,7 @@ python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/folds
 
 Options: `--scenarios zeroshot,calib,personal,personal_calib,louo,louo_calib` adds the leave-one-user-out control, `--curve 1,2,4,8` adds the learning curve (`personal_prev<k>`: the k sessions recorded just before), and `--personal-order chronological` trains on earlier sessions only.
 
-**3. Fix the fine-tuning settings before scoring any test task.** Write a tuning manifest with validation sessions held out of training, train without testing, and read `val_err_deg` per epoch in each `log.json`:
+**3. (Optional) check the fine-tuning settings before scoring any test task.** `protocol_config.json` uses the official ETH-XGaze defaults. To check, for example, the number of epochs without touching test data, write a tuning manifest with validation sessions held out of training, train without testing, and read `val_err_deg` per epoch in each `log.json`:
 
 ```bash
 python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/tune.json --test-sessions 9 --val-sessions 2 --scenarios personal
@@ -75,4 +75,4 @@ This writes `scenarios.csv`, `users.csv`, `contrasts.csv` (paired gains, % of se
 | `personal` | about 16,000 (the user's other ~20 sessions) | 1 per held-out session |
 | `louo` | about 135,000 (8 users) | 1 per user |
 
-`personal` dominates: 20 held-out sessions × 16k frames × 5 epochs ≈ 1.6 M training images.
+`personal` dominates: 20 held-out sessions × 16k frames × 25 epochs ≈ 8 M training images. The number of epochs is the main cost lever.

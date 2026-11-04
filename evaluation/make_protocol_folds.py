@@ -47,10 +47,11 @@ def main():
     ap.add_argument("--label", choices=("gaze_eth", "gaze_released"), default="gaze_eth")
     ap.add_argument("--personal-pool", choices=("user", "all"), default="user")
     ap.add_argument("--personal-order", choices=("loso", "chronological"), default="loso")
-    ap.add_argument("--val-sessions", type=int, default=0,
-                    help="personal*: hold out this many training sessions as validation (their test tasks); "
-                         "chronological -> the most recent ones, loso -> random")
-    ap.add_argument("--val-users", type=int, default=0, help="louo: hold out this many training users as validation")
+    ap.add_argument("--val-sessions", type=int, default=1,
+                    help="personal: hold out this many training sessions as validation for early stopping "
+                         "(their test tasks); chronological -> the most recent ones, loso -> random")
+    ap.add_argument("--val-users", type=int, default=1,
+                    help="louo: hold out this many training users as validation for early stopping (test tasks)")
     ap.add_argument("--test-sessions", type=int, help="held-out sessions in total (default: all)")
     ap.add_argument("--curve", default="", help="learning curve, e.g. 1,2,4,8 -> scenarios personal_prev<k>")
     ap.add_argument("--seed", type=int, default=0)
@@ -122,10 +123,13 @@ def main():
                         folds.append(dict(id=fid, scenario=sc, init=f"louo/u{u}", train=calib, val=[], test=test))
                     elif sc.startswith("personal_prev"):
                         k = int(sc[len("personal_prev"):])
-                        before = [x for x in sessions[u] if x < s][-k:]
+                        earlier = [x for x in sessions[u] if x < s]
+                        before = earlier[-k:]
                         if len(before) == k:
+                            # validation: the session just before the k training sessions, if any
+                            val = [clause([u], [earlier[-k - 1]], "test")] if len(earlier) > k else []
                             folds.append(dict(id=fid, scenario=sc, init="eth",
-                                              train=[clause([u], before, "all")], val=[], test=test))
+                                              train=[clause([u], before, "all")], val=val, test=test))
                     else:
                         raise SystemExit(f"unknown scenario {sc}")
 

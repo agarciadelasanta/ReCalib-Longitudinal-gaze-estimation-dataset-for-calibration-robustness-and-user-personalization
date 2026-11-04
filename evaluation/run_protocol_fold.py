@@ -3,7 +3,12 @@
 Each fold starts from the ETH-XGaze checkpoint, or from the saved model of the fold named in its
 "init" field, fine-tunes the whole network on its training set with the settings of its group in
 protocol_config.json (L1 loss on normalized pitch/yaw, Adam, as in the ETH-XGaze training code) and
-scores its test frames in the camera frame:
+scores its test frames in the camera frame. Training stops early when the validation error has not
+improved for early_stopping_patience epochs, and the best-validation weights are kept. Validation is
+the fold's validation set (a held-out training session or user, see make_protocol_folds.py); folds
+without one (the calibration task) hold out val_points of the calibration targets instead, and with
+refit the model is then retrained from its start weights on all targets for the best number of epochs.
+Test frames are scored in the camera frame:
 
   ang_err_deg        angle to the manifest label (gaze_eth or gaze_released), in degrees
   ang_err_eth_deg    angle to unit(pog_mm - ETH face centre)
@@ -24,10 +29,12 @@ louo_calib (they start from the personal / louo models). --index fits job arrays
 (e.g. --index $SLURM_ARRAY_TASK_ID).
 """
 import argparse
+import copy
 import csv
 import json
 import random
 import time
+import zlib
 from pathlib import Path
 
 import h5py
@@ -61,10 +68,12 @@ def load_model(path, device):
 
 
 def loader(h5_path, indices, label, batch_size, shuffle, workers, seed=0):
+    """Only training loaders (shuffle=True) keep their workers between epochs: on Windows every worker
+    process loads its own copy of torch, and idle validation/test workers exhaust the paging file."""
     g = torch.Generator()
     g.manual_seed(seed)
     return torch.utils.data.DataLoader(H5Faces(h5_path, indices, label), batch_size=batch_size, shuffle=shuffle,
-                                       num_workers=workers, generator=g, persistent_workers=workers > 0,
+                                       num_workers=workers, generator=g, persistent_workers=shuffle and workers > 0,
                                        pin_memory=torch.cuda.is_available())
 
 
@@ -79,7 +88,26 @@ def predict(model, data, device):
     return np.concatenate(rows), np.concatenate(preds), np.concatenate(labels)
 
 
+def split_points(h5_path, indices, n_val, fold_id):
+    """Hold out n_val stimulus points (all their frames) of a calibration training set as validation."""
+    indices = np.sort(indices)
+    with h5py.File(h5_path, "r") as h5:
+        pog = np.round(h5["pog_mm"][indices][:, :2], 1)
+    points, point_of = np.unique(pog, axis=0, return_inverse=True)
+    point_of = point_of.reshape(-1)
+    if len(points) < n_val + 2:
+        return indices, indices[:0]
+    rng = np.random.default_rng(zlib.crc32(fold_id.encode()))
+    val_points = rng.choice(len(points), n_val, replace=False)
+    is_val = np.isin(point_of, val_points)
+    return indices[~is_val], indices[is_val]
+
+
 def train(model, train_data, val_data, cfg, device, log):
+    """Fine-tune in place; with validation data and a patience, stop early and keep the best weights.
+    Returns the number of epochs of the kept weights."""
+    patience = cfg.get("early_stopping_patience") if val_data is not None else None
+    best_err, best_epoch, best_state, waited = np.inf, cfg["epochs"], None, 0
     opt = torch.optim.Adam(model.parameters(), lr=cfg["lr"], weight_decay=cfg["weight_decay"])
     sched = torch.optim.lr_scheduler.StepLR(opt, step_size=cfg["lr_step"], gamma=cfg["lr_gamma"])
     use_amp = device.type == "cuda"
@@ -112,6 +140,19 @@ def train(model, train_data, val_data, cfg, device, log):
             entry["val_err_deg"] = float(angle_deg(pitchyaw_to_vector(vp), pitchyaw_to_vector(vy)).mean())
         log["epochs"].append(entry)
         print("  " + "  ".join(f"{k}={v:.4g}" if isinstance(v, float) else f"{k}={v}" for k, v in entry.items()))
+        if patience:
+            if entry["val_err_deg"] < best_err:
+                best_err, best_epoch, waited = entry["val_err_deg"], epoch + 1, 0
+                best_state = copy.deepcopy({k: v.detach().cpu() for k, v in model.state_dict().items()})
+            else:
+                waited += 1
+                if waited >= patience:
+                    print(f"  early stop: no improvement for {patience} epochs, best epoch {best_epoch}")
+                    break
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        log.update(best_epoch=best_epoch, best_val_err_deg=best_err)
+    return best_epoch
 
 
 def score(h5_path, label, rows, pitchyaw, meta):
@@ -159,10 +200,28 @@ def run_fold(fold, manifest, meta, args, cfg_all, device):
                device=str(device), epochs=[], started=time.strftime("%Y-%m-%dT%H:%M:%S"))
     t0 = time.time()
     if fold["train"]:
-        tr = loader(h5_path, select(meta, fold["train"]), label, cfg["batch_size"], True, args.num_workers, args.seed)
-        va = (loader(h5_path, select(meta, fold["val"]), label, cfg_all["eval_batch_size"], False, args.num_workers)
-              if fold["val"] else None)
-        train(model, tr, va, cfg, device, log)
+        train_idx = select(meta, fold["train"])
+        val_idx = select(meta, fold["val"]) if fold["val"] else train_idx[:0]
+        refit = False
+        if not len(val_idx) and cfg.get("val_points"):
+            all_idx = train_idx
+            train_idx, val_idx = split_points(h5_path, train_idx, cfg["val_points"], fold["id"])
+            refit = cfg.get("refit", False) and len(val_idx) > 0
+        if not len(val_idx) and cfg.get("early_stopping_patience"):
+            print("  no validation data: no early stopping, training all epochs")
+        log.update(n_train_used=int(len(train_idx)), n_val_used=int(len(val_idx)))
+        tr = loader(h5_path, train_idx, label, cfg["batch_size"], True, args.num_workers, args.seed)
+        va = (loader(h5_path, val_idx, label, cfg_all["eval_batch_size"], False, args.num_workers)
+              if len(val_idx) else None)
+        best_epoch = train(model, tr, va, cfg, device, log)
+        if refit:  # same start weights, all calibration targets, the selected number of epochs
+            print(f"  refit on all {len(all_idx)} calibration frames for {best_epoch} epochs")
+            seed_everything(args.seed)
+            model = load_model(init, device)
+            refit_log = dict(epochs=[])
+            train(model, loader(h5_path, all_idx, label, cfg["batch_size"], True, args.num_workers, args.seed),
+                  None, dict(cfg, epochs=best_epoch), device, refit_log)
+            log.update(refit_epochs=best_epoch, refit=refit_log["epochs"], n_train_used=int(len(all_idx)))
     if fold["save_model"]:
         torch.save({"model_state": model.state_dict()}, out / "model.pth")
     if not args.no_test:
