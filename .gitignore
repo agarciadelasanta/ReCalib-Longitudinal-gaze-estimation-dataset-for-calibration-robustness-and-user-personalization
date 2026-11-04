@@ -17,3 +17,4 @@ logs/
 .agents/
 logs/
 recalib_agent_context/
+!labelling/user_depth_scale.csv

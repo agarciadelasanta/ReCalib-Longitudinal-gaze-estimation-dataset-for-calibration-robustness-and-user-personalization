@@ -56,7 +56,7 @@ with Labeller("ReCalib/setup.json") as labeller:                     # many imag
 python -m recalib_labelling.verify_release --release-root ReCalib --n 200
 ```
 
-On 200 random samples the labels are reproduced exactly. Landmarks, head rotation, screen target and quality metrics are identical; gaze origin and head translation differ by at most 0.0002 mm (rounding of the intrinsics stored in `setup.json`).
+On 200 random samples the labels are reproduced exactly. Landmarks, head rotation, screen target and quality metrics are identical; gaze origin and head translation differ by at most 0.0002 mm, and gaze vectors by at most 0.0001° (rounding).
 
 ## What is computed
 
@@ -94,7 +94,13 @@ python -m recalib_labelling.face_scale --labels labels_one_image.csv --setup ReC
 |---|---|---|---|---|---|---|---|---|---|
 | Factor | 0.998 | 1.040 | 0.997 | 0.976 | 1.017 | 1.013 | 1.032 | 0.984 | 1.027 |
 
-**Validation on EVE** (`validation/`): see `Review answer/eve_origin_validation.md` in the paper repository.
+**Validation on EVE** (`validation/`): the labelling was applied unchanged to 39,724 frames of 44 EVE participants, whose 3D eye positions come from a face model scaled per person with a calibrated multi-camera rig. Agreement with EVE:
+
+| | One image | Several images (per-user face scale) |
+|---|---|---|
+| Gaze origin, lateral (median) | 2.6 mm | 2.6 mm |
+| Gaze origin, depth (median; p5 to p95) | +3.3% (−5.3 to +11.4%) | +0.8% (−5.6 to +6.2%) |
+| Gaze vector, angle to the same target (median / p95) | 0.97° / 2.49° | 0.63° / 1.64° |
 
 ## Tests
 
