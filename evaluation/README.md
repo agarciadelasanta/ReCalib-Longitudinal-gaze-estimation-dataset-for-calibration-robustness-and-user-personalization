@@ -8,6 +8,8 @@ python -m pip install -r requirements.txt
 
 The pretrained checkpoint is not stored in Git; `ckpt/readme.txt` says where to download it.
 
+Face landmarks for the ETH-XGaze normalization come from dlib's 68-point shape predictor. It is not stored in Git either: `dlib_model.py` downloads it from [dlib.net](http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2) into `evaluation/modules/` the first time it is needed and checks its SHA-256. The model is trained on the iBUG 300-W dataset, whose licence excludes commercial use; check that licence before using it.
+
 | Script | What it does |
 |---|---|
 | `eth_xgaze_baseline.py` | Zero-shot ETH-XGaze over a ReCalib tree → CSV with the angular and on-screen error of every sample. Uses only the image, the camera intrinsics and the target (`pog_mm`) |

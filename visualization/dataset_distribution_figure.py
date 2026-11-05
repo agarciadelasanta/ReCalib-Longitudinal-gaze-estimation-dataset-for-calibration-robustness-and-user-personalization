@@ -1,6 +1,6 @@
 """Panels of the paper figure 'Distribution of gaze and head pose parameters for a representative participant'.
 
-    python visualization/dataset_distribution_figure.py --index F:/recalib_release/ReCalib/recalib_index.csv \
+    python visualization/dataset_distribution_figure.py --index ReCalib/recalib_index.csv \
         --user 05 --out <paper>/assets/figures
 
 Kept samples of one participant, calibration vs. test tasks (panels a-f) and calibration tasks per

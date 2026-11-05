@@ -38,7 +38,7 @@ The raw attributes and device fields are personal data: keep the output out of t
 public repository.
 
 Example:
-    py -I evaluation/extract_raw_labels.py --raw-root F:\\recalib_raw --output recalib_raw_labels.csv
+    py -I evaluation/extract_raw_labels.py --raw-root recalib_raw --output recalib_raw_labels.csv
 """
 import argparse
 import csv

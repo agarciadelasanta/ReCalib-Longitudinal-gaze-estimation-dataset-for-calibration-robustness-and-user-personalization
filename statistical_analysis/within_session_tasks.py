@@ -15,7 +15,7 @@ Outputs (in --out): per_session_metrics.csv, per_user_metrics.csv, statistical_t
 within_session_tasks.png/.pdf
 
 Usage:
-    python within_session_tasks.py --index F:/recalib_release/ReCalib/recalib_index.csv --out temp/within_session
+    python within_session_tasks.py --index ReCalib/recalib_index.csv --out temp/within_session
 """
 import argparse
 from pathlib import Path

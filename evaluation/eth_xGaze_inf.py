@@ -202,9 +202,8 @@ class ETHXGazeEstimator:
         self._cnn = False
         if shape_predictor_path is not None:
             import dlib
-            if not os.path.isfile(shape_predictor_path):
-                raise FileNotFoundError(f"shape predictor not found: {shape_predictor_path}")
-            self.predictor = dlib.shape_predictor(shape_predictor_path)
+            from dlib_model import ensure_shape_predictor
+            self.predictor = dlib.shape_predictor(ensure_shape_predictor(shape_predictor_path))
 
             if use_cnn_detector:
                 if not cnn_detector_path or not os.path.isfile(cnn_detector_path):

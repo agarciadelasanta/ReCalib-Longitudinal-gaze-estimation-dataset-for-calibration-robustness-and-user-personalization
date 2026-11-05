@@ -22,7 +22,7 @@ Test sets are always the 16-point test tasks of the held-out session. Everything
 
 ## Steps
 
-Requirements: `pip install -r requirements.txt`, plus `evaluation/ckpt/epoch_24_ckpt.pth.tar` and `evaluation/modules/shape_predictor_68_face_landmarks.dat`. Run from the repo root.
+Requirements: `pip install -r requirements.txt`, plus `evaluation/ckpt/epoch_24_ckpt.pth.tar`. The dlib 68-point shape predictor is downloaded from dlib.net into `evaluation/modules/` on first use (see `evaluation/README.md`). Run from the repo root.
 
 **1. Normalize the release once** (CPU, dlib on the full 1920×1080 image; about 2 s per frame per worker on a laptop CPU):
 

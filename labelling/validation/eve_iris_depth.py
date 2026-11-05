@@ -1,7 +1,7 @@
 """Iris-based depth on EVE: can the iris size replace MediaPipe's fixed face scale?
 
-    python -m validation.eve_iris_depth --frames-root H:/EVE/Mamu_untagged --h5-root H:/EVE/Extracted_webcam_h5 \
-        --out H:/EVE/relabel_eval/eve_iris.csv [--stride 50]
+    python -m validation.eve_iris_depth --frames-root EVE/frames --h5-root EVE/webcam_h5 \
+        --out eve_eval/eve_iris.csv [--stride 50]
 
 Same frames, target and reference origin as eve_compare.py. For each frame it also stores the iris
 diameters in pixels from the MediaPipe iris landmarks (ring 469-472 and ring 474-477; opposite points

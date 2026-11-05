@@ -5,6 +5,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 
+from dlib_model import ensure_shape_predictor
 from eth_xGaze_inf import load_camera_npz
 
 # --- CONFIGURATION ---
@@ -65,7 +66,7 @@ def process_dataset():
 
     K, dist = load_camera_npz(CAMERA_NPZ)
     face_detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor(SHAPE_PREDICTOR)
+    predictor = dlib.shape_predictor(ensure_shape_predictor(SHAPE_PREDICTOR))
     
     # face model 3D (6 points) compatible with ETH-XGaze
     face_model_load = np.loadtxt(FACE_MODEL)

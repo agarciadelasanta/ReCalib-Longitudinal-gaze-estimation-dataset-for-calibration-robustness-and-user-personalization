@@ -1,7 +1,7 @@
 """Compare the ReCalib labelling with the EVE ground truth (webcam_c).
 
-    python -m validation.eve_compare --frames-root H:/EVE/Mamu_untagged --h5-root H:/EVE/Extracted_webcam_h5 \
-        --out H:/EVE/relabel_eval/eve_compare.csv [--stride 10] [--recordings train01/step040_...]
+    python -m validation.eve_compare --frames-root EVE/frames --h5-root EVE/webcam_h5 \
+        --out eve_eval/eve_compare.csv [--stride 10] [--recordings train01/step040_...]
 
 Frames are read from <frames-root>/<recording>/webcam_c.zip, or from an extracted webcam_c/ folder.
 

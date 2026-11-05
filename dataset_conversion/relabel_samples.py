@@ -1,7 +1,7 @@
 """Relabel released samples in place with labelling/, keeping their quality flags.
 
-    python dataset_conversion/relabel_samples.py --release-root F:/recalib_release/ReCalib --codes 10 \
-        --backup F:/recalib_release/backup_relabel_code10 [--write]
+    python dataset_conversion/relabel_samples.py --release-root ReCalib --codes 10 \
+        --backup backup_relabel_code10 [--write]
 
 For every sample of recalib_index.csv whose discard code is in --codes, the gaze, head_pose and
 quality_assurance_metrics blocks of its JSON are regenerated with labelling/recalib_labelling (with the

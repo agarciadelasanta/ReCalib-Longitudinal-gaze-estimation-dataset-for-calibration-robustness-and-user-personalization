@@ -51,7 +51,8 @@ class ReleaseFrames(torch.utils.data.Dataset):
         if self.source in ("dlib", "dlib_then_json"):
             if self._dlib is None:
                 import dlib
-                self._dlib = (dlib.get_frontal_face_detector(), dlib.shape_predictor(self.shape_predictor))
+                from dlib_model import ensure_shape_predictor
+                self._dlib = (dlib.get_frontal_face_detector(), dlib.shape_predictor(ensure_shape_predictor(self.shape_predictor)))
             lm = dlib_eth_landmarks(*self._dlib, image)
         if lm is None and self.source in ("json", "dlib_then_json"):
             try:
