@@ -11,7 +11,7 @@ python -m statistical_analysis dataset_summary_recalib.csv --output temp/statist
 python visualization/explore_statistical_analysis.py --report-dir temp/statistical_analysis --open
 ```
 
-Metric definitions, the inferential workflow and the output schema are in [`../docs/statistical_analysis.md`](../docs/statistical_analysis.md).
+The options (feature families, views, bootstrap and permutation settings) are listed by `python -m statistical_analysis --help`.
 
 ## `within_session_tasks.py`: calibration vs test tasks within a session
 

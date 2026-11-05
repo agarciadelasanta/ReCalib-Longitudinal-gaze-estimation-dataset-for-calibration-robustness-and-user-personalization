@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .progress import stage
 from .core import AnalysisConfig, analyze_frame
 
 
@@ -81,8 +82,10 @@ def analyze_csv(
         "task_id": "string",
         "sample_id": "string",
     }
+    stage(f"Reading {input_path}...")
     frame = pd.read_csv(input_path, dtype=identity_dtypes, low_memory=False)
     result = analyze_frame(frame, config)
+    stage(f"Writing analysis report to {output_dir}...")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     tables = {

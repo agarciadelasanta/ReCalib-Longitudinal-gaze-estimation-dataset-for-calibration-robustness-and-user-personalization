@@ -96,6 +96,43 @@ class StatisticalAnalysisExplorerTests(unittest.TestCase):
             self.assertIn("profile-chart", explorer)
             self.assertIn("mismatch-chart", explorer)
             self.assertNotIn("__PAIRWISE_JSON__", explorer)
+            self.assertNotIn(
+                "const detail = `Estimate ${formatValue(row.estimate)}<br>95% CI",
+                explorer,
+            )
+            self.assertNotIn(
+                'label(statistic) + " %{z:.4f}<br>%{customdata}', explorer
+            )
+            self.assertNotIn(
+                'Mean " + label(statistic) + " %{x:.4f}', explorer
+            )
+            self.assertIn(
+                "95% confidence intervals and p/q values are unavailable",
+                explorer,
+            )
+            self.assertIn(
+                'aria-label="Explain participant comparison matrix"', explorer
+            )
+            self.assertIn('id="matrix-threshold"', explorer)
+            self.assertIn('id="ranking-threshold"', explorer)
+            self.assertIn('id="profile-threshold"', explorer)
+            self.assertIn('id="mismatch-threshold"', explorer)
+            self.assertIn("median + 3×MAD", explorer)
+
+            for filename, table in (
+                ("calibration_test_mismatch.csv", "mismatch"),
+                ("user_profiles.csv", "profiles"),
+            ):
+                with self.subTest(empty_table=table):
+                    path = report_dir / filename
+                    original = path.read_bytes()
+                    pd.DataFrame().to_csv(path, index=False)
+                    empty_report = read_report(report_dir)
+                    self.assertTrue(empty_report[table].empty)
+                    self.assertEqual(len(empty_report["pairwise"]), 1)
+                    self.assertIn("ReCalib Statistical Analysis Explorer",
+                                  build_html(empty_report, report_dir.name))
+                    path.write_bytes(original)
 
 
 if __name__ == "__main__":

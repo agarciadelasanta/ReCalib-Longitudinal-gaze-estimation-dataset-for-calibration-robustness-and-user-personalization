@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .progress import progress, stage
 from .metrics import compare_unit_sets, describe_samples, descriptor_scales
 
 
@@ -37,6 +38,12 @@ FEATURE_COLUMNS = {
     ),
 }
 
+LANDMARK_FAMILIES = ("landmark_position", "landmark_scale", "landmark_shape")
+DEFAULT_FEATURE_FAMILIES = tuple(
+    family for family in FEATURE_COLUMNS if family not in LANDMARK_FAMILIES
+)
+LANDMARK_INPUT_COLUMNS = (*LANDMARK_SOURCE_COLUMNS, "img_res_width", "img_res_height")
+
 FEATURE_SOURCES = {
     "target_coverage": ("pog_px_x", "pog_px_y"),
     "head_rotation": FEATURE_COLUMNS["head_rotation"],
@@ -44,9 +51,9 @@ FEATURE_SOURCES = {
     "gaze_origin": FEATURE_COLUMNS["gaze_origin"],
     "gaze_point": ("gaze_pog_x", "gaze_pog_y"),
     "head_translation": FEATURE_COLUMNS["head_translation"],
-    "landmark_position": LANDMARK_SOURCE_COLUMNS,
-    "landmark_scale": LANDMARK_SOURCE_COLUMNS,
-    "landmark_shape": LANDMARK_SOURCE_COLUMNS,
+    "landmark_position": LANDMARK_INPUT_COLUMNS,
+    "landmark_scale": LANDMARK_INPUT_COLUMNS,
+    "landmark_shape": LANDMARK_INPUT_COLUMNS,
     "quality": FEATURE_COLUMNS["quality"],
 }
 
@@ -57,11 +64,59 @@ FEATURE_NOTES = {
     "gaze_point": "Screen-plane gaze point in millimetres; constant z excluded.",
     "head_rotation": "Joint Euler-angle head rotation in radians.",
     "head_translation": "Three-dimensional head translation in millimetres.",
-    "landmark_position": "Centroid of the selected facial landmarks in pixels.",
-    "landmark_scale": "RMS landmark radius around the facial centroid in pixels.",
-    "landmark_shape": "Landmarks centered and divided by RMS facial scale.",
+    "landmark_position": "Centroid of facial landmarks normalized by per-sample image width and height.",
+    "landmark_scale": "RMS radius around the facial centroid in image-normalized coordinates.",
+    "landmark_shape": "Image-normalized landmarks centered and divided by RMS facial scale.",
     "quality": "Joint quality-assurance measurements in native units.",
 }
+
+# Label sets: "recalib" uses the released labels; "eth" replaces the label-derived
+# families with the ETH-XGaze baseline columns appended by create_dataset_summary.py
+# --eth-csv. Families absent from ETH_FEATURE_SOURCES do not depend on the labels and
+# are shared; head pose has no ETH counterpart.
+LABEL_SETS = ("recalib", "eth")
+ETH_ORIGIN_COLUMNS = ("eth_face_center_x", "eth_face_center_y", "eth_face_center_z")
+ETH_FEATURE_SOURCES = {
+    "gaze_direction": ("eth_label_x", "eth_label_y", "eth_label_z"),
+    "gaze_origin": ETH_ORIGIN_COLUMNS,
+}
+ETH_FEATURE_COLUMNS = {"gaze_origin": ETH_ORIGIN_COLUMNS}
+ETH_FEATURE_NOTES = {
+    "gaze_direction": "ETH-XGaze label: unit vector from the ETH face centre to the target, as pitch and yaw in radians.",
+    "gaze_origin": "ETH-XGaze face centre (solvePnP) in millimetres.",
+}
+ETH_UNAVAILABLE_FAMILIES = ("head_rotation", "head_translation")
+ETH_FILTER_COLUMN = "eth_ok"
+# task_type names of the calibration and test tasks: released summaries use
+# "calibration"/"test", older ones "9-point"/"16-point".
+CALIBRATION_TASK_TYPES = ("calibration", "9-point")
+TEST_TASK_TYPES = ("test", "16-point")
+
+
+def feature_sources(family: str, label_set: str = "recalib") -> tuple[str, ...]:
+    if label_set == "eth" and family in ETH_FEATURE_SOURCES:
+        return ETH_FEATURE_SOURCES[family]
+    return FEATURE_SOURCES[family]
+
+
+def feature_columns(family: str, label_set: str = "recalib") -> tuple[str, ...]:
+    if label_set == "eth" and family in ETH_FEATURE_COLUMNS:
+        return ETH_FEATURE_COLUMNS[family]
+    return FEATURE_COLUMNS[family]
+
+
+def feature_note(family: str, label_set: str = "recalib") -> str:
+    if label_set == "eth" and family in ETH_FEATURE_NOTES:
+        return ETH_FEATURE_NOTES[family]
+    return FEATURE_NOTES[family]
+
+
+def available_families(families: tuple[str, ...], label_set: str) -> tuple[str, ...]:
+    """Drop the families a label set cannot provide (used for CLI defaults)."""
+
+    if label_set == "eth":
+        return tuple(family for family in families if family not in ETH_UNAVAILABLE_FAMILIES)
+    return tuple(families)
 
 
 def _metric_method(family: str, metric: str) -> str:
@@ -84,14 +139,23 @@ def _metric_method(family: str, metric: str) -> str:
 class AnalysisConfig:
     """Configuration for the public in-memory analysis interface."""
 
-    feature_families: tuple[str, ...] = tuple(FEATURE_COLUMNS)
+    feature_families: tuple[str, ...] = DEFAULT_FEATURE_FAMILIES
     views: tuple[str, ...] = ("target_conditioned", "raw")
     bootstrap_iterations: int = 500
     permutation_iterations: int = 1_000
     confidence_level: float = 0.95
     random_seed: int = 42
+    label_set: str = "recalib"
 
     def __post_init__(self) -> None:
+        if self.label_set not in LABEL_SETS:
+            raise ValueError(f"label_set must be one of: {', '.join(LABEL_SETS)}")
+        if self.label_set == "eth":
+            unavailable = [f for f in self.feature_families if f in ETH_UNAVAILABLE_FAMILIES]
+            if unavailable:
+                raise ValueError(
+                    "Feature families without ETH-XGaze labels: " + ", ".join(unavailable)
+                )
         if self.bootstrap_iterations < 0:
             raise ValueError("bootstrap_iterations must be non-negative")
         if self.permutation_iterations < 0:
@@ -116,11 +180,136 @@ class AnalysisResult:
     column_catalog: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
-def _accepted_mask(values: pd.Series) -> pd.Series:
+def _prepare_accepted_frame(
+    frame: pd.DataFrame,
+    config: AnalysisConfig,
+    *,
+    require_task_type: bool = True,
+) -> pd.DataFrame:
+    """Validate one summary frame, exclude discarded rows, and derive features."""
+
+    label_set = config.label_set
+    required = {"user_id", "session_id", "discarded"}
+    if require_task_type:
+        required.add("task_type")
+    if label_set == "eth":
+        required.add(ETH_FILTER_COLUMN)
+    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
+        required.update({"pog_px_x", "pog_px_y"})
+    for family in config.feature_families:
+        if family not in FEATURE_COLUMNS:
+            raise ValueError(f"Unknown feature family: {family}")
+        required.update(feature_sources(family, label_set))
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+
+    accepted = frame.loc[_accepted_mask(frame, label_set)].copy()
+    identity_columns = ["user_id", "session_id"]
+    if "task_type" in accepted:
+        identity_columns.append("task_type")
+    for column in identity_columns:
+        accepted[column] = accepted[column].astype("string")
+
+    numeric_columns = set()
+    for family in config.feature_families:
+        numeric_columns.update(feature_sources(family, label_set))
+    if "target_conditioned" in config.views:
+        numeric_columns.update({"pog_px_x", "pog_px_y"})
+        numeric_columns.update(
+            column
+            for column in ("screen_width_px", "screen_height_px")
+            if column in accepted
+        )
+    for column in sorted(numeric_columns):
+        original = accepted[column]
+        numeric = pd.to_numeric(original, errors="coerce")
+        invalid = original.notna() & numeric.isna()
+        if invalid.any():
+            raise ValueError(
+                f"Column {column!r} contains {int(invalid.sum())} non-numeric "
+                "accepted values"
+            )
+        accepted[column] = numeric
+    accepted = accepted.copy()
+
+    if "gaze_direction" in config.feature_families:
+        gaze = accepted[list(feature_sources("gaze_direction", label_set))].to_numpy(float)
+        norms = np.linalg.norm(gaze, axis=1, keepdims=True)
+        normalized = np.divide(
+            gaze,
+            norms,
+            out=np.full_like(gaze, np.nan),
+            where=norms > 1e-12,
+        )
+        accepted["_gaze_pitch"] = -np.arcsin(np.clip(normalized[:, 1], -1.0, 1.0))
+        accepted["_gaze_yaw"] = np.arctan2(-normalized[:, 0], -normalized[:, 2])
+    if any(family.startswith("landmark_") for family in config.feature_families):
+        landmark_values = accepted[list(LANDMARK_SOURCE_COLUMNS)].to_numpy(float)
+        points = landmark_values.reshape(len(accepted), len(LANDMARK_IDS), 2)
+        dimensions = accepted[["img_res_width", "img_res_height"]].to_numpy(float)
+        if not (np.isfinite(dimensions) & (dimensions > 0)).all():
+            raise ValueError(
+                "Landmark analysis requires finite, positive img_res_width and "
+                "img_res_height for every accepted sample"
+            )
+        points = points / dimensions[:, None, :]
+        centers = np.nanmean(points, axis=1)
+        centered = points - centers[:, None, :]
+        scales = np.sqrt(np.nanmean(np.sum(centered**2, axis=2), axis=1))
+        normalized_shape = np.divide(
+            centered,
+            scales[:, None, None],
+            out=np.full_like(centered, np.nan),
+            where=scales[:, None, None] > 1e-12,
+        )
+        accepted["_landmark_center_x"] = centers[:, 0]
+        accepted["_landmark_center_y"] = centers[:, 1]
+        accepted["_landmark_scale"] = scales
+        shape_frame = pd.DataFrame(
+            normalized_shape.reshape(len(accepted), -1),
+            index=accepted.index,
+            columns=FEATURE_COLUMNS["landmark_shape"],
+        )
+        accepted = pd.concat([accepted, shape_frame], axis=1)
+    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
+        width = pd.Series(2736.0, index=accepted.index)
+        height = pd.Series(1824.0, index=accepted.index)
+        if "screen_width_px" in accepted:
+            observed_width = pd.to_numeric(accepted["screen_width_px"], errors="coerce")
+            width = observed_width.where(observed_width > 0, width)
+        if "screen_height_px" in accepted:
+            observed_height = pd.to_numeric(accepted["screen_height_px"], errors="coerce")
+            height = observed_height.where(observed_height > 0, height)
+        accepted["_pog_norm_x"] = accepted["pog_px_x"] / width
+        accepted["_pog_norm_y"] = accepted["pog_px_y"] / height
+        accepted["_target_x"] = accepted["_pog_norm_x"].round(4)
+        accepted["_target_y"] = accepted["_pog_norm_y"].round(4)
+    return accepted
+
+
+def _not_discarded(values: pd.Series) -> pd.Series:
     if pd.api.types.is_bool_dtype(values):
         return ~values.fillna(False)
     normalized = values.astype("string").str.strip().str.lower()
     return ~normalized.isin({"true", "1", "yes"})
+
+
+def _accepted_mask(frame: pd.DataFrame, label_set: str = "recalib") -> pd.Series:
+    """Non-discarded rows; with ETH labels, only those the baseline processed (eth_ok == 1)."""
+
+    mask = _not_discarded(frame["discarded"])
+    if label_set == "eth":
+        mask &= pd.to_numeric(frame[ETH_FILTER_COLUMN], errors="coerce").eq(1)
+    return mask
+
+
+def exclusion_counts(frame: pd.DataFrame, accepted: pd.DataFrame, label_set: str) -> dict[str, int]:
+    discarded = int((~_not_discarded(frame["discarded"])).sum())
+    counts = {"discarded_rows_excluded": discarded}
+    if label_set == "eth":
+        counts["eth_unavailable_rows_excluded"] = int(len(frame) - len(accepted) - discarded)
+    return counts
 
 
 def _column_catalog(
@@ -132,9 +321,13 @@ def _column_catalog(
         "image", "sample_id", "task_id", "session_id", "user_id", "task_type",
         "discarded", "discard_code", "discard_info",
     }
+    filters = {"discarded"}
+    if config.label_set == "eth":
+        structural.add(ETH_FILTER_COLUMN)
+        filters.add(ETH_FILTER_COLUMN)
     source_to_families: dict[str, list[str]] = {}
     for family in config.feature_families:
-        for column in FEATURE_SOURCES[family]:
+        for column in feature_sources(family, config.label_set):
             source_to_families.setdefault(column, []).append(family)
     if "target_conditioned" in config.views:
         source_to_families.setdefault("pog_px_x", []).append("target_conditioning")
@@ -151,7 +344,7 @@ def _column_catalog(
             reason = ",".join(sorted(set(source_to_families[column])))
         elif column in structural:
             role = "structure"
-            used = column in {"session_id", "user_id", "task_type", "discarded"}
+            used = column in {"session_id", "user_id", "task_type", *filters}
             reason = "grouping/filtering" if used else "identifier_or_audit_field"
         elif missing_fraction == 1.0:
             role = "unusable"
@@ -264,7 +457,7 @@ def _bootstrap_intervals(
     if iterations <= 0:
         return {}
     samples: dict[str, list[float]] = {}
-    for _ in range(iterations):
+    for _ in progress(range(iterations), "Bootstrap", unit="draw"):
         boot = pd.concat(
             [
                 _resample_user_sessions(units, user_a, rng),
@@ -307,7 +500,7 @@ def _permutation_p_values(
     n_left = pair.loc[pair["user_id"].eq(user_a), "_cluster"].nunique()
     exceedances = {metric: 0 for metric in observed}
     valid = {metric: 0 for metric in observed}
-    for _ in range(iterations):
+    for _ in progress(range(iterations), "Permutations", unit="shuffle"):
         shuffled = rng.permutation(len(clusters))
         left_clusters = {clusters[index] for index in shuffled[:n_left]}
         permuted = pair.copy()
@@ -396,6 +589,14 @@ def _longitudinal_profile_rows(
     return rows
 
 
+def _task_units(
+    raw_units: dict[tuple[str, str], pd.DataFrame],
+    family: str,
+    task_types: tuple[str, ...],
+) -> pd.DataFrame | None:
+    return next((raw_units[(family, task)] for task in task_types if (family, task) in raw_units), None)
+
+
 def _calibration_test_rows(
     raw_units: dict[tuple[str, str], pd.DataFrame],
     config: AnalysisConfig,
@@ -403,8 +604,8 @@ def _calibration_test_rows(
 ) -> list[dict[str, Any]]:
     rows = []
     for family in config.feature_families:
-        calibration = raw_units.get((family, "9-point"))
-        test = raw_units.get((family, "16-point"))
+        calibration = _task_units(raw_units, family, CALIBRATION_TASK_TYPES)
+        test = _task_units(raw_units, family, TEST_TASK_TYPES)
         if calibration is None or test is None:
             continue
         scales = descriptor_scales(pd.concat([calibration, test], ignore_index=True))
@@ -469,66 +670,26 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
     """Analyze an in-memory ReCalib summary frame through one stable seam."""
 
     config = config or AnalysisConfig()
-    required = {"user_id", "session_id", "task_type", "discarded"}
-    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
-        required.update({"pog_px_x", "pog_px_y"})
-    for family in config.feature_families:
-        if family not in FEATURE_COLUMNS:
-            raise ValueError(f"Unknown feature family: {family}")
-        required.update(FEATURE_SOURCES[family])
-    missing = sorted(required.difference(frame.columns))
-    if missing:
-        raise ValueError(f"Missing required columns: {', '.join(missing)}")
-
-    accepted = frame.loc[_accepted_mask(frame["discarded"])].copy()
+    stage("Preparing individual analysis...")
+    accepted = _prepare_accepted_frame(frame, config)
     rng = np.random.default_rng(config.random_seed)
-    if "gaze_direction" in config.feature_families:
-        gaze = accepted[list(FEATURE_SOURCES["gaze_direction"])].to_numpy(float)
-        norms = np.linalg.norm(gaze, axis=1, keepdims=True)
-        normalized = np.divide(
-            gaze,
-            norms,
-            out=np.full_like(gaze, np.nan),
-            where=norms > 1e-12,
-        )
-        accepted["_gaze_pitch"] = -np.arcsin(np.clip(normalized[:, 1], -1.0, 1.0))
-        accepted["_gaze_yaw"] = np.arctan2(-normalized[:, 0], -normalized[:, 2])
-    if any(family.startswith("landmark_") for family in config.feature_families):
-        landmark_values = accepted[list(LANDMARK_SOURCE_COLUMNS)].to_numpy(float)
-        points = landmark_values.reshape(len(accepted), len(LANDMARK_IDS), 2)
-        centers = np.nanmean(points, axis=1)
-        centered = points - centers[:, None, :]
-        scales = np.sqrt(np.nanmean(np.sum(centered**2, axis=2), axis=1))
-        normalized_shape = np.divide(
-            centered,
-            scales[:, None, None],
-            out=np.full_like(centered, np.nan),
-            where=scales[:, None, None] > 1e-12,
-        )
-        accepted["_landmark_center_x"] = centers[:, 0]
-        accepted["_landmark_center_y"] = centers[:, 1]
-        accepted["_landmark_scale"] = scales
-        for index, column in enumerate(FEATURE_COLUMNS["landmark_shape"]):
-            accepted[column] = normalized_shape.reshape(len(accepted), -1)[:, index]
-    if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
-        accepted["_pog_norm_x"] = accepted["pog_px_x"] / 2736.0
-        accepted["_pog_norm_y"] = accepted["pog_px_y"] / 1824.0
-        accepted["_target_x"] = accepted["_pog_norm_x"].round(4)
-        accepted["_target_y"] = accepted["_pog_norm_y"].round(4)
     rows: list[dict[str, Any]] = []
     profile_rows: list[dict[str, Any]] = []
     raw_units: dict[tuple[str, str], pd.DataFrame] = {}
     for task_type, task_frame in accepted.groupby("task_type", sort=True):
-        for family in config.feature_families:
-            columns = list(FEATURE_COLUMNS[family])
+        for family in progress(config.feature_families, f"Task {task_type}: features", unit="family"):
+            columns = list(feature_columns(family, config.label_set))
             complete = task_frame.dropna(subset=columns)
+            if complete.empty:
+                stage(f"Skipping {task_type}/{family}: no complete feature rows.")
+                continue
             session_counts = complete.groupby("user_id")["session_id"].nunique()
             sample_counts = complete.groupby("user_id").size()
             family_views = tuple(
                 view for view in config.views
                 if not (family == "target_coverage" and view == "target_conditioned")
             )
-            for view in family_views:
+            for view in progress(family_views, family, unit="view"):
                 if view == "raw":
                     units = _describe_units(complete, columns, conditioned=False)
                     raw_units[(family, str(task_type))] = units
@@ -554,7 +715,10 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
                 )
                 scales = descriptor_scales(units)
 
-                for user_a, user_b in combinations(users, 2):
+                for user_a, user_b in progress(
+                    combinations(users, 2), f"{family}/{view}: user pairs",
+                    total=len(users) * (len(users) - 1) // 2, unit="pair",
+                ):
                     estimates = _compare_users(
                         units,
                         user_a,
@@ -610,6 +774,7 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
             group_columns, sort=False, group_keys=False
         )["p_value"].apply(_fdr_bh)
 
+    stage("Computing calibration/test mismatch...")
     mismatch = pd.DataFrame(_calibration_test_rows(raw_units, config, rng))
 
     catalog = pd.DataFrame(
@@ -617,9 +782,9 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
             {
                 "family": family,
                 "dimensions": len(FEATURE_COLUMNS[family]),
-                "source_columns": ",".join(FEATURE_SOURCES[family]),
+                "source_columns": ",".join(feature_sources(family, config.label_set)),
                 "supported_views": "raw" if family == "target_coverage" else ",".join(config.views),
-                "notes": FEATURE_NOTES[family],
+                "notes": feature_note(family, config.label_set),
             }
             for family in config.feature_families
         ]
@@ -628,9 +793,10 @@ def analyze_frame(frame: pd.DataFrame, config: AnalysisConfig | None = None) -> 
 
     return AnalysisResult(
         metadata={
+            "label_set": config.label_set,
             "input_rows": int(len(frame)),
             "accepted_rows": int(len(accepted)),
-            "discarded_rows_excluded": int(len(frame) - len(accepted)),
+            **exclusion_counts(frame, accepted, config.label_set),
             "users": int(accepted["user_id"].nunique()),
             "user_sessions": int(
                 accepted[["user_id", "session_id"]].drop_duplicates().shape[0]

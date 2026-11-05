@@ -71,9 +71,15 @@ def parse_args(argv=None):
     return args, parser
 
 
-def _read_csv(path: Path, identity_columns=()) -> pd.DataFrame:
+def _read_csv(path: Path, identity_columns=(), *, allow_empty=False) -> pd.DataFrame:
     dtypes = {column: "string" for column in identity_columns}
-    return pd.read_csv(path, dtype=dtypes, low_memory=False)
+    try:
+        return pd.read_csv(path, dtype=dtypes, low_memory=False)
+    except pd.errors.EmptyDataError:
+        if not allow_empty:
+            raise
+        # Optional analyses can produce a headerless CSV when no rows apply.
+        return pd.DataFrame()
 
 
 def read_report(report_dir: Path) -> dict:
@@ -85,10 +91,12 @@ def read_report(report_dir: Path) -> dict:
     profiles = _read_csv(
         report_dir / REQUIRED_FILES["profiles"],
         ("user_id",),
+        allow_empty=True,
     )
     mismatch = _read_csv(
         report_dir / REQUIRED_FILES["mismatch"],
         ("user_id", "session_id"),
+        allow_empty=True,
     )
     features = _read_csv(report_dir / REQUIRED_FILES["features"])
 
@@ -190,6 +198,9 @@ def build_html(report: dict, source_name: str) -> str:
         ["family", "dimensions", "supported_views", "notes"],
     )
     metadata = report["manifest"].get("metadata", {})
+    label_set = {"recalib": "ReCalib labels", "eth": "ETH-XGaze labels"}.get(
+        str(metadata.get("label_set", "recalib")), str(metadata.get("label_set"))
+    )
 
     template = r"""<!doctype html>
 <html lang="en">
@@ -282,7 +293,13 @@ def build_html(report: dict, source_name: str) -> str:
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px; margin-top: 12px;
     }
-    .panel { min-width: 0; padding: 16px; }
+    .panel { position: relative; min-width: 0; padding: 16px; }
+    .panel-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+    .panel-heading h2 { margin: 0; }
+    .help-button { display: inline-grid; place-items: center; width: 21px; height: 21px; padding: 0; border: 1px solid var(--border); border-radius: 50%; color: var(--text); background: transparent; font: 500 .78rem/1 system-ui, sans-serif; cursor: help; }
+    .help-button:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .help-popup { position: absolute; z-index: 10; top: 48px; left: 16px; right: 16px; visibility: hidden; opacity: 0; padding: 10px 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); font-size: .84rem; line-height: 1.4; transition: opacity .12s ease; }
+    .help-button:hover + .help-popup, .help-button:focus + .help-popup { visibility: visible; opacity: 1; }
     .wide { grid-column: 1 / -1; }
     .chart { width: 100%; min-height: 390px; }
     .heatmap { min-height: 570px; }
@@ -314,7 +331,7 @@ def build_html(report: dict, source_name: str) -> str:
       <h1>ReCalib Statistical Analysis Explorer</h1>
       <p>Pairwise domain distances, longitudinal variability, and calibration/test mismatch.</p>
     </div>
-    <p class="note">Source: __SOURCE_NAME__ · __ACCEPTED__ accepted samples · __USERS__ users · __SESSIONS__ sessions</p>
+    <p class="note">Source: __SOURCE_NAME__ · __LABEL_SET__ · __ACCEPTED__ accepted samples · __USERS__ users · __SESSIONS__ sessions</p>
   </header>
 
   <section class="controls" aria-label="Statistical result filters">
@@ -335,20 +352,20 @@ def build_html(report: dict, source_name: str) -> str:
 
   <section class="grid">
     <article class="panel wide">
-      <h2>Participant × participant matrix</h2>
+      <div class="panel-heading"><h2>Participant × participant matrix</h2><button class="help-button" type="button" aria-label="Explain participant comparison matrix" aria-describedby="help-matrix">?</button><div id="help-matrix" class="help-popup" role="tooltip">Each cell compares two participants for the selected family, KPI, task, and view. For distance estimates, zero means similar and larger means more different; smaller is not automatically better. <span id="matrix-threshold">The exploratory anomaly screen is median + 3×MAD.</span> Confirm candidates using their CI and q &lt; 0.05.</div></div>
       <div id="matrix-chart" class="chart heatmap" role="img" aria-label="Pairwise participant distance heatmap"></div>
       <p id="pair-selection" class="selection" aria-live="polite">Select a matrix cell to inspect a participant pair.</p>
     </article>
     <article class="panel">
-      <h2>Mean selected matrix value by participant</h2>
+      <div class="panel-heading"><h2>Mean selected matrix value by participant</h2><button class="help-button" type="button" aria-label="Explain participant ranking" aria-describedby="help-ranking">?</button><div id="help-ranking" class="help-popup" role="tooltip">Average pairwise distance for each participant. Lower values mean the participant is more typical of the cohort; higher values indicate broader separation. <span id="ranking-threshold">The exploratory anomaly screen is median + 3×MAD.</span> This is a screening rule, not a significance test.</div></div>
       <div id="ranking-chart" class="chart" role="img" aria-label="Participant mean distance ranking"></div>
     </article>
     <article class="panel">
-      <h2>Longitudinal session instability</h2>
+      <div class="panel-heading"><h2>Longitudinal session instability</h2><button class="help-button" type="button" aria-label="Explain longitudinal instability" aria-describedby="help-profile">?</button><div id="help-profile" class="help-popup" role="tooltip">Measures how much each participant changes across sessions. Lower means more repeatable sessions; higher means greater within-user drift. <span id="profile-threshold">The exploratory anomaly screen is median + 3×MAD.</span></div></div>
       <div id="profile-chart" class="chart" role="img" aria-label="Within-participant session instability"></div>
     </article>
     <article class="panel wide">
-      <h2>Calibration-to-test mismatch by session</h2>
+      <div class="panel-heading"><h2>Calibration-to-test mismatch by session</h2><button class="help-button" type="button" aria-label="Explain calibration-to-test mismatch" aria-describedby="help-mismatch">?</button><div id="help-mismatch" class="help-popup" role="tooltip">Compares calibration samples with test samples inside the same session. Lower means the two phases are statistically closer; higher suggests a session-level mismatch that may complicate calibration. <span id="mismatch-threshold">The exploratory anomaly screen is median + 3×MAD.</span></div></div>
       <div id="mismatch-chart" class="chart" role="img" aria-label="Calibration-to-test mismatch distributions"></div>
     </article>
     <article class="panel wide">
@@ -379,19 +396,21 @@ const warning = document.getElementById("warning");
 const numericFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 });
 const integerFormat = new Intl.NumberFormat();
 const statisticColumns = ["estimate", "ci_low", "ci_high", "p_value", "q_value"];
+const statisticLabels = {estimate:"Estimate", ci_low:"95% CI lower bound", ci_high:"95% CI upper bound", p_value:"p-value", q_value:"FDR-adjusted q-value"};
 
 function unique(values) { return [...new Set(values)].sort(); }
 function isNumber(value) { return typeof value === "number" && Number.isFinite(value); }
 function formatValue(value) { return isNumber(value) ? numericFormat.format(value) : "—"; }
 function label(value) { return String(value).replaceAll("_", " "); }
+function statisticLabel(value) { return statisticLabels[value] || label(value); }
 
-function setOptions(select, values, preferred = null) {
+function setOptions(select, values, preferred = null, optionLabel = label) {
   const current = preferred ?? select.value;
   select.replaceChildren();
   for (const value of values) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = label(value);
+    option.textContent = optionLabel(value);
     select.appendChild(option);
   }
   if (values.includes(current)) select.value = current;
@@ -407,10 +426,11 @@ function refreshDependentControls() {
   const family = familyFilter.value;
   const familyRows = PAIRS.filter(row => row.family === family);
   setOptions(metricFilter, unique(familyRows.map(row => row.metric)), metricFilter.value || "distribution_shift");
-  setOptions(taskFilter, unique(familyRows.map(row => row.task_type)), taskFilter.value || "16-point");
+  const tasks = unique(familyRows.map(row => row.task_type));
+  setOptions(taskFilter, tasks, taskFilter.value || (tasks.includes("test") ? "test" : "16-point"));
   setOptions(viewFilter, unique(familyRows.map(row => row.view)), viewFilter.value || "target_conditioned");
   const availableStatistics = statisticColumns.filter(column => familyRows.some(row => isNumber(row[column])));
-  setOptions(statisticFilter, availableStatistics, statisticFilter.value || "estimate");
+  setOptions(statisticFilter, availableStatistics, statisticFilter.value || "estimate", statisticLabel);
 }
 
 function selectedRows() {
@@ -460,8 +480,47 @@ function summary(rows, statistic) {
   return { extreme, median };
 }
 
+function medianOf(values) {
+  const sorted = values.filter(isNumber).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function updateThreshold(target, values, statistic = "estimate") {
+  const element = document.getElementById(target);
+  if (["p_value", "q_value"].includes(statistic)) {
+    element.textContent = statistic === "q_value"
+      ? "Use q < 0.05 as the conventional FDR-adjusted evidence threshold; do not use a high-value anomaly cutoff."
+      : "Use p < 0.05 only as unadjusted evidence and confirm with q < 0.05; do not average p-values to declare anomalies.";
+    return;
+  }
+  if (statistic !== "estimate") {
+    element.textContent = "A confidence-bound value alone has no anomaly cutoff; interpret it together with the estimate and q-value.";
+    return;
+  }
+  const valid = values.filter(isNumber);
+  const center = medianOf(valid);
+  const mad = center === null ? null : medianOf(valid.map(value => Math.abs(value - center)));
+  if (center === null || mad === null || mad <= 1e-12) {
+    element.textContent = "A median + 3×MAD screening cutoff cannot be estimated for the current selection.";
+    return;
+  }
+  element.textContent = `Current exploratory cutoff: values above ${formatValue(center + 3 * mad)} (median + 3×MAD).`;
+}
+
+function pairDetailParts(row, statistic) {
+  const parts = [`${statisticLabel(statistic)} ${formatValue(row[statistic])}`];
+  if (statistic !== "estimate" && isNumber(row.estimate)) parts.push(`Estimate ${formatValue(row.estimate)}`);
+  if (isNumber(row.ci_low) && isNumber(row.ci_high)) parts.push(`95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}`);
+  if (isNumber(row.p_value)) parts.push(`p-value ${formatValue(row.p_value)}`);
+  if (isNumber(row.q_value)) parts.push(`q-value ${formatValue(row.q_value)}`);
+  return parts;
+}
+
 function renderMatrix(rows) {
   const statistic = statisticFilter.value;
+  updateThreshold("matrix-threshold", rows.map(row => row[statistic]), statistic);
   const significance = ["p_value", "q_value"].includes(statistic);
   document.getElementById("extreme-pair-label").textContent = significance
     ? "Smallest participant pair" : "Largest participant pair";
@@ -475,11 +534,11 @@ function renderMatrix(rows) {
     const a = users.indexOf(row.user_a);
     const b = users.indexOf(row.user_b);
     z[a][b] = row[statistic]; z[b][a] = row[statistic];
-    const detail = `Estimate ${formatValue(row.estimate)}<br>95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}<br>p ${formatValue(row.p_value)} · q ${formatValue(row.q_value)}`;
+    const detail = pairDetailParts(row, statistic).join("<br>");
     details[a][b] = detail; details[b][a] = detail;
   }
   if (!rows.length || !z.some(row => row.some(isNumber))) {
-    renderEmpty("matrix-chart", `No ${label(statistic)} values are available for this selection.`);
+    renderEmpty("matrix-chart", `No ${statisticLabel(statistic)} values are available for this selection.`);
     document.getElementById("max-pair").textContent = "—";
     document.getElementById("max-value").textContent = "—";
     document.getElementById("median-value").textContent = "—";
@@ -489,8 +548,8 @@ function renderMatrix(rows) {
   Plotly.react("matrix-chart", [{
     type: "heatmap", x: users, y: users, z, customdata: details,
     colorscale: [[0, colors.low], [0.5, colors.mid], [1, colors.high]],
-    colorbar: { title: label(statistic), thickness: 14 },
-    hovertemplate: "User %{y} vs user %{x}<br>" + label(statistic) + " %{z:.4f}<br>%{customdata}<extra></extra>"
+    colorbar: { title: statisticLabel(statistic), thickness: 14 },
+    hovertemplate: "User %{y} vs user %{x}<br>%{customdata}<extra></extra>"
   }], layout({
     xaxis: { title: "Participant", side: "bottom" },
     yaxis: { title: "Participant", autorange: "reversed", scaleanchor: "x" },
@@ -509,9 +568,7 @@ function renderMatrix(rows) {
       || (item.user_a === point.y && item.user_b === point.x));
     if (!row) return;
     document.getElementById("pair-selection").textContent =
-      `Users ${row.user_a}–${row.user_b}: estimate ${formatValue(row.estimate)}, ` +
-      `95% CI ${formatValue(row.ci_low)}–${formatValue(row.ci_high)}, ` +
-      `p ${formatValue(row.p_value)}, q ${formatValue(row.q_value)}.`;
+      `Users ${row.user_a}–${row.user_b}: ${pairDetailParts(row, statistic).join(", ")}.`;
   });
 }
 
@@ -528,15 +585,16 @@ function renderRanking(rows) {
   const ranking = [...values.entries()].map(([user, items]) => ({
     user, value: items.reduce((sum, item) => sum + item, 0) / items.length
   })).sort((a, b) => a.value - b.value);
+  updateThreshold("ranking-threshold", ranking.map(row => row.value), statistic);
   if (!ranking.length) { renderEmpty("ranking-chart", "No participant ranking is available."); return; }
   Plotly.react("ranking-chart", [{
     type: "bar", orientation: "h",
     y: ranking.map(row => `User ${row.user}`), x: ranking.map(row => row.value),
     marker: { color: theme().accent },
     text: ranking.map(row => formatValue(row.value)), textposition: "auto",
-    hovertemplate: "%{y}<br>Mean " + label(statistic) + " %{x:.4f}<extra></extra>"
+    hovertemplate: "%{y}<br>Mean " + statisticLabel(statistic) + " %{x:.4f}<extra></extra>"
   }], layout({
-    xaxis: { title: `Mean ${label(statistic)}`, gridcolor: theme().border },
+    xaxis: { title: `Mean ${statisticLabel(statistic)}`, gridcolor: theme().border },
     yaxis: { automargin: true }
   }), plotConfig);
 }
@@ -545,6 +603,7 @@ function renderProfiles() {
   const rows = PROFILES.filter(row => row.family === familyFilter.value
     && row.task_type === taskFilter.value && row.view === viewFilter.value);
   const medianRows = rows.filter(row => row.metric === "longitudinal_instability_median").sort((a, b) => a.user_id.localeCompare(b.user_id));
+  updateThreshold("profile-threshold", medianRows.map(row => row.estimate));
   const iqrMap = new Map(rows.filter(row => row.metric === "longitudinal_instability_iqr").map(row => [row.user_id, row.estimate]));
   if (!medianRows.length) { renderEmpty("profile-chart", "Longitudinal profiles are unavailable for this selection."); return; }
   Plotly.react("profile-chart", [{
@@ -562,6 +621,7 @@ function renderProfiles() {
 function renderMismatch() {
   const rows = MISMATCH.filter(row => row.family === familyFilter.value
     && row.metric === metricFilter.value && row.aggregation === "session" && isNumber(row.estimate));
+  updateThreshold("mismatch-threshold", rows.map(row => row.estimate));
   if (!rows.length) { renderEmpty("mismatch-chart", "Calibration/test mismatch is unavailable for this KPI."); return; }
   const users = unique(rows.map(row => row.user_id));
   const colors = theme();
@@ -604,6 +664,9 @@ function renderTable(rows) {
 
 function renderWarning(rows) {
   const messages = [];
+  if (!rows.some(row => isNumber(row.ci_low) && isNumber(row.ci_high)) && !rows.some(row => isNumber(row.p_value) || isNumber(row.q_value))) {
+    messages.push("95% confidence intervals and p/q values are unavailable because this report was generated without bootstrap or permutation iterations.");
+  }
   if (statisticFilter.value !== "estimate" && !rows.some(row => isNumber(row[statisticFilter.value]))) {
     messages.push("This report was generated without the selected inferential statistic.");
   }
@@ -640,6 +703,7 @@ update();
     return (
         template.replace("__PLOTLY_JS__", get_plotlyjs())
         .replace("__SOURCE_NAME__", html.escape(source_name))
+        .replace("__LABEL_SET__", html.escape(label_set))
         .replace("__ACCEPTED__", f"{int(metadata.get('accepted_rows', 0)):,}")
         .replace("__USERS__", str(metadata.get("users", "—")))
         .replace("__SESSIONS__", str(metadata.get("user_sessions", "—")))
