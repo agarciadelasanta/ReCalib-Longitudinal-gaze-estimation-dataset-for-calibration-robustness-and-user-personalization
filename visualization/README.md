@@ -20,7 +20,7 @@ Head-pose plots use a deterministic subsample to keep the report responsive; cou
 
 ## `visualize_sample.py`: one sample
 
-Shows the labels of one image: the target and gaze intersection on the screen, the landmarks, eye regions and gaze vector over the image, and an interactive 3D view of the camera, screen, head pose and gaze ray. By default it opens the bundled example (`example/07_00_02_img-0040.png`); any other `.png`/`.jpg` with a same-named `.json` can be given.
+Shows the labels of one image: the target and gaze intersection on the screen, the landmarks, eye regions and gaze vector over the image, and an interactive 3D view of the camera, screen, head pose and gaze ray. By default it opens the bundled example (`example/07_00_02_img-0039.png`); any other `.png`/`.jpg` with a same-named `.json` can be given.
 
 ```bash
 python visualization/visualize_sample.py

@@ -13,7 +13,7 @@ from utils import checkIfisAValidPNGPair
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TEST_IMAGE = REPO_ROOT / "example" / "07_00_02_img-0040.png"
+DEFAULT_TEST_IMAGE = REPO_ROOT / "example" / "07_00_02_img-0039.png"
 DEFAULT_SETUP_CONFIG = REPO_ROOT / "docs" / "setup.json"
 DEFAULT_SHAPE_PREDICTOR = (
     REPO_ROOT / "evaluation" / "modules" / "shape_predictor_68_face_landmarks.dat"
