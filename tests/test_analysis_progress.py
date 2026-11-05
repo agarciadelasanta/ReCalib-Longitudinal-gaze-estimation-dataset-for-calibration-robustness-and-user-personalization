@@ -29,7 +29,7 @@ class AnalysisProgressTests(unittest.TestCase):
             csv_a, csv_b = root / "a.csv", root / "b.csv"
             frame.to_csv(csv_a, index=False)
             frame.assign(head_rot_x=frame.head_rot_x + 1).to_csv(csv_b, index=False)
-            for command in ([str(csv_a)], ["compare", str(csv_a), str(csv_b)]):
+            for command in ([str(csv_a)],):
                 with self.subTest(command=command):
                     outputs = []
                     for quiet in (False, True):
@@ -46,7 +46,7 @@ class AnalysisProgressTests(unittest.TestCase):
                         if quiet:
                             self.assertEqual(stderr.getvalue(), "")
                         else:
-                            self.assertIn("Bootstrap" if command[0] != "compare" else "Dataset bootstrap", stderr.getvalue())
+                            self.assertIn("Bootstrap", stderr.getvalue())
                             self.assertIn("Permutations", stderr.getvalue())
                         outputs.append({
                             path.relative_to(output): path.read_bytes()

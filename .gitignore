@@ -16,4 +16,7 @@ logs/
 
 .agents/
 logs/
-recalib_agent_context/scripts/
+recalib_agent_context/
+!labelling/user_depth_scale.csv
+scripts/
+docs/private/

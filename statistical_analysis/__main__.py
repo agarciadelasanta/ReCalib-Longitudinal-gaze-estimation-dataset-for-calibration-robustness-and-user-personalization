@@ -10,10 +10,6 @@ from .core import (
     AnalysisConfig, FEATURE_COLUMNS, DEFAULT_FEATURE_FAMILIES, LABEL_SETS, LANDMARK_FAMILIES,
     available_families,
 )
-from .comparison import (
-    DATASET_COMPARISON_FAMILIES, DEFAULT_COMPARISON_FAMILIES, LABEL_COMPARISON_FAMILIES,
-    compare_csvs, compare_label_sets_csv,
-)
 from .consistency import ConsistencyConfig, VECTOR_SOURCES, analyze_consistency_csv
 from .reporting import analyze_csv
 from .progress import progress_enabled
@@ -58,67 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("target_conditioned", "raw"),
         default=("target_conditioned", "raw"),
         help="Analysis views (default: target-conditioned and raw).",
-    )
-    parser.add_argument(
-        "--bootstrap",
-        type=int,
-        default=500,
-        help="Session-bootstrap iterations; use 0 to disable (default: 500).",
-    )
-    parser.add_argument(
-        "--permutations",
-        type=int,
-        default=1_000,
-        help="Session-label permutation iterations; use 0 to disable (default: 1000).",
-    )
-    parser.add_argument(
-        "--confidence",
-        type=float,
-        default=0.95,
-        help="Bootstrap confidence level in (0, 1) (default: 0.95).",
-    )
-    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
-    parser.add_argument("--include-landmarks", action="store_true",
-                        help="Add landmark position, scale, and shape using image-normalized coordinates.")
-    _add_labels_argument(parser)
-    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
-    return parser
-
-
-def build_compare_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="python -m statistical_analysis compare",
-        description=(
-            "Measure the overall hierarchical statistical domain gap between "
-            "two independent, comparison-compatible dataset-summary CSVs. "
-            "Source task labels are not used to stratify the comparison."
-        ),
-    )
-    parser.add_argument("csv_a", type=Path, help="First dataset-summary CSV.")
-    parser.add_argument("csv_b", type=Path, help="Second dataset-summary CSV.")
-    parser.add_argument(
-        "--output",
-        type=Path,
-        required=True,
-        help="Directory for the domain-gap report bundle.",
-    )
-    parser.add_argument("--name-a", help="Display label for the first dataset.")
-    parser.add_argument("--name-b", help="Display label for the second dataset.")
-    parser.add_argument(
-        "--families",
-        nargs="+",
-        choices=DATASET_COMPARISON_FAMILIES,
-        help=(
-            "Feature families to compare (default: non-quality, non-landmark "
-            "families available for --labels)."
-        ),
-    )
-    parser.add_argument(
-        "--views",
-        nargs="+",
-        choices=("target_conditioned", "raw"),
-        default=("raw",),
-        help="Analysis views (default: raw overall comparison).",
     )
     parser.add_argument(
         "--bootstrap",
@@ -194,38 +129,6 @@ def build_consistency_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_compare_labels_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="python -m statistical_analysis compare-labels",
-        description=(
-            "Compare the ReCalib and ETH-XGaze labels of one dataset-summary CSV "
-            "with the dataset-comparison KPIs, using only the label families both "
-            "systems provide and only the samples that have both labels."
-        ),
-    )
-    parser.add_argument("csv", type=Path, help="Dataset-summary CSV with ETH-XGaze columns.")
-    parser.add_argument("--output", type=Path, required=True,
-                        help="Directory for the comparison report bundle.")
-    parser.add_argument(
-        "--families",
-        nargs="+",
-        choices=LABEL_COMPARISON_FAMILIES,
-        help="Label families to compare (default: all of them).",
-    )
-    parser.add_argument("--views", nargs="+", choices=("target_conditioned", "raw"),
-                        default=("raw",), help="Analysis views (default: raw).")
-    parser.add_argument("--bootstrap", type=int, default=500,
-                        help="Session-bootstrap iterations; use 0 to disable (default: 500).")
-    parser.add_argument("--permutations", type=int, default=1_000,
-                        help="Whole-user permutation iterations; use 0 to disable (default: 1000).")
-    parser.add_argument("--confidence", type=float, default=0.95,
-                        help="Bootstrap confidence level in (0, 1) (default: 0.95).")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42).")
-    parser.add_argument("--no-progress", action="store_true", help="Hide terminal progress bars.")
-    parser.set_defaults(include_landmarks=False, labels="recalib")
-    return parser
-
-
 def _config_from_args(
     args: argparse.Namespace,
     parser: argparse.ArgumentParser,
@@ -257,57 +160,6 @@ def _config_from_args(
 
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] == "compare":
-        parser = build_compare_parser()
-        args = parser.parse_args(argv[1:])
-        config = _config_from_args(args, parser, DEFAULT_COMPARISON_FAMILIES)
-        try:
-            with progress_enabled(not args.no_progress):
-                manifest = compare_csvs(
-                    args.csv_a,
-                    args.csv_b,
-                    args.output,
-                    config,
-                    label_a=args.name_a,
-                    label_b=args.name_b,
-                )
-        except (FileNotFoundError, ValueError) as error:
-            parser.error(str(error))
-        print(
-            json.dumps(
-                {
-                    "report_type": "independent_dataset_comparison",
-                    "output_dir": manifest.output_dir,
-                    "files": len(manifest.files),
-                    "metadata": manifest.metadata,
-                },
-                indent=2,
-            )
-        )
-        return 0
-
-    if argv and argv[0] == "compare-labels":
-        parser = build_compare_labels_parser()
-        args = parser.parse_args(argv[1:])
-        config = _config_from_args(args, parser, LABEL_COMPARISON_FAMILIES)
-        try:
-            with progress_enabled(not args.no_progress):
-                manifest = compare_label_sets_csv(args.csv, args.output, config)
-        except (FileNotFoundError, ValueError) as error:
-            parser.error(str(error))
-        print(
-            json.dumps(
-                {
-                    "report_type": "label_set_comparison",
-                    "output_dir": manifest.output_dir,
-                    "files": len(manifest.files),
-                    "metadata": manifest.metadata,
-                },
-                indent=2,
-            )
-        )
-        return 0
-
     if argv and argv[0] == "consistency":
         parser = build_consistency_parser()
         args = parser.parse_args(argv[1:])

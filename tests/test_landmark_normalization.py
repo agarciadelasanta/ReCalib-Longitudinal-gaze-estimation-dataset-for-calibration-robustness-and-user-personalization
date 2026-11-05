@@ -3,14 +3,11 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from statistical_analysis.__main__ import (
-    _config_from_args, build_parser, build_compare_parser,
-)
+from statistical_analysis.__main__ import _config_from_args, build_parser
 from statistical_analysis.core import (
-    AnalysisConfig, FEATURE_COLUMNS, LANDMARK_FAMILIES, LANDMARK_IDS,
+    AnalysisConfig, DEFAULT_FEATURE_FAMILIES, FEATURE_COLUMNS, LANDMARK_FAMILIES, LANDMARK_IDS,
     _prepare_accepted_frame, analyze_frame,
 )
-from statistical_analysis.comparison import DEFAULT_COMPARISON_FAMILIES, compare_frames
 
 
 def samples():
@@ -30,13 +27,13 @@ def samples():
 class LandmarkNormalizationTests(unittest.TestCase):
     def test_cli_and_library_defaults_exclude_landmarks_and_cli_can_opt_in(self):
         self.assertTrue(set(LANDMARK_FAMILIES).isdisjoint(AnalysisConfig().feature_families))
-        self.assertTrue(set(LANDMARK_FAMILIES).isdisjoint(DEFAULT_COMPARISON_FAMILIES))
-        for parser, inputs in ((build_parser(), ["a.csv"]),
-                               (build_compare_parser(), ["a.csv", "b.csv"])):
+        parser = build_parser()
+        for inputs in (["a.csv"],):
             args = [*inputs, "--output", "output"]
-            default = _config_from_args(parser.parse_args(args), parser)
+            default = _config_from_args(parser.parse_args(args), parser, DEFAULT_FEATURE_FAMILIES)
             self.assertTrue(set(LANDMARK_FAMILIES).isdisjoint(default.feature_families))
-            enabled = _config_from_args(parser.parse_args([*args, "--include-landmarks"]), parser)
+            enabled = _config_from_args(parser.parse_args([*args, "--include-landmarks"]), parser,
+                                        DEFAULT_FEATURE_FAMILIES)
             self.assertTrue(set(LANDMARK_FAMILIES).issubset(enabled.feature_families))
 
     def test_per_sample_resolution_changes_leave_both_analyses_unchanged(self):
@@ -60,8 +57,6 @@ class LandmarkNormalizationTests(unittest.TestCase):
         np.testing.assert_allclose(prepared._landmark_center_x, expected_x)
         pd.testing.assert_frame_equal(analyze_frame(original, config).pairwise_distances,
                                       analyze_frame(resized, config).pairwise_distances)
-        pd.testing.assert_frame_equal(compare_frames(original, original, config).dataset_distances,
-                                      compare_frames(original, resized, config).dataset_distances)
 
     def test_landmarks_require_valid_image_dimensions(self):
         config = AnalysisConfig(feature_families=LANDMARK_FAMILIES, views=("raw",))
