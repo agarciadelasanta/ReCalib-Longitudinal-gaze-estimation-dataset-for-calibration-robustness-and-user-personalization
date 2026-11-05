@@ -37,8 +37,21 @@ class Read_gaze_data:
     def loadSetupSpecs(self, json_path):
         with open(json_path, 'r') as f:
             setup_data = json.load(f)
-               
-        # Handle screen parameters - set defaults if not present
+
+        if "screen" in setup_data:
+            # setup.json of the release
+            screen = setup_data["screen"]
+            camera = setup_data["camera"]
+            self.screen_mm = np.array([screen["width_mm"], screen["height_mm"]])
+            self.screen_pixels = np.array([screen["logical_height_px"], screen["logical_width_px"]])
+            self.zoom = screen["display_zoom"]
+            self.screen_orientation = screen["orientation"]
+            self.posCam_mm = camera["position_mm"]
+            self.data["rotCam"] = camera["rotation_rad"]
+            self.img_res = setup_data["image_resolution_px"]
+            return
+
+        # Legacy setup_config.json - set defaults if not present
         if "screen_mm" in setup_data:
             self.screen_mm = np.array([setup_data["screen_mm"]["width"], setup_data["screen_mm"]["height"]])
         else:

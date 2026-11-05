@@ -1,0 +1,80 @@
+{
+    "device": "Microsoft Surface Pro 7+ (integrated front camera)",
+    "image_resolution_px": {
+        "height": 1080,
+        "width": 1920
+    },
+    "screen": {
+        "width_mm": 260,
+        "height_mm": 173,
+        "width_px": 2736,
+        "height_px": 1824,
+        "logical_width_px": 1368,
+        "logical_height_px": 912,
+        "display_zoom": 2.0,
+        "orientation": 0
+    },
+    "camera": {
+        "position_mm": {
+            "x": 0,
+            "y": 10,
+            "z": 0
+        },
+        "rotation_rad": {
+            "x": 0.0,
+            "y": 3.141592653589793,
+            "z": 0.0
+        },
+        "camera_matrix": [
+            [
+                1475.1831,
+                0.0,
+                962.2621
+            ],
+            [
+                0.0,
+                1471.5504,
+                576.2511
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ]
+        ],
+        "dist_coeffs_k1_k2_p1_p2_k3": [
+            0.191598,
+            -0.57611,
+            0.005297,
+            0.003183,
+            0.629015
+        ]
+    },
+    "conventions": {
+        "pog_px": "screen target in physical pixels of the native panel (origin top-left)",
+        "3d_frame": "camera frame, mm: +X image right, +Y image down, +Z away from the camera",
+        "gaze": "origin_mm = midpoint between the eyes; pog_mm = target on the screen plane; vector = unit(pog_mm - origin_mm). origin_mm includes the participant's face-scale factor (user_face_scale)",
+        "head_pose": "MediaPipe FaceLandmarker pose re-expressed in the calibrated camera; rotation_rad = extrinsic Euler 'zyx' angles [roll, yaw, pitch]; rotvec_rad = same rotation as axis-angle; translation_mm = origin of MediaPipe's canonical face, multiplied by the participant's face-scale factor (user_face_scale)",
+        "discard_info": "null for kept samples; otherwise discarding_reason (code) and its name"
+    },
+    "user_face_scale": {
+        "description": "Per-participant factor applied to head translation and gaze origin, so that the canonical face matches the participant's face size; estimated from the iris diameter (11.7 mm) over all kept samples of the participant",
+        "factors": {
+            "00": 0.99843,
+            "01": 1.0395,
+            "02": 0.99716,
+            "03": 0.97641,
+            "04": 1.01664,
+            "05": 1.01251,
+            "06": 1.03222,
+            "07": 0.98416,
+            "08": 1.02724
+        }
+    },
+    "labelling_code": {
+        "repository": "https://github.com/agarciadelasanta/ReCalib-A-multi-session-gaze-dataset-for-calibration-robustness-and-user-adaptation",
+        "folder": "labelling/",
+        "commit": "3f9b7a2",
+        "mediapipe": "0.10.21, face_landmarker.task float16 v1 (SHA-256 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff)"
+    }
+}

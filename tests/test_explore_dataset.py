@@ -40,10 +40,10 @@ class ExploreDatasetTest(unittest.TestCase):
             }
         )
 
-    def test_setup_config_applies_zoom_and_converts_mm_to_cm(self):
+    def test_setup_json_screen_geometry_in_physical_px_and_cm(self):
         parser = argparse.ArgumentParser()
         screen = explore_dataset.read_screen_geometry(
-            REPO_ROOT / "docs" / "setup_config.json", parser
+            REPO_ROOT / "docs" / "setup.json", parser
         )
 
         self.assertEqual(screen.width_px, 2736)
