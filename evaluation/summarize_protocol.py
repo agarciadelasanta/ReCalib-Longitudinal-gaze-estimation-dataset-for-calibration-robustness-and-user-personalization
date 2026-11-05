@@ -15,6 +15,9 @@ held-out session first, and every comparison pairs the same sessions in two scen
   report.md       the tables above in Markdown
 
     python evaluation/summarize_protocol.py --runs runs --out runs/summary
+    python evaluation/summarize_protocol.py --runs runs --out runs/summary_sub --sessions keep.csv
+
+--sessions restricts every table to the sessions listed in a CSV with columns user, session.
 """
 import argparse
 from pathlib import Path
@@ -66,6 +69,7 @@ def main():
     ap.add_argument("--runs", type=Path, required=True, help="--out-dir of run_protocol_fold.py")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--metric", default="ang_err_deg", help="per-frame error column (deg)")
+    ap.add_argument("--sessions", type=Path, help="CSV with columns user, session: analyse only these sessions")
     ap.add_argument("--bootstrap", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -73,6 +77,11 @@ def main():
     rng = np.random.default_rng(args.seed)
 
     df = load_runs(args.runs)
+    if args.sessions:
+        keep = pd.read_csv(args.sessions, dtype=str)[["user", "session"]]
+        keep = keep.assign(user=keep.user.str.zfill(2), session=keep.session.str.zfill(2))
+        df = df.merge(keep, on=["user", "session"])
+        print(f"restricted to {len(keep)} sessions from {args.sessions}")
     sess = (df.groupby(["scenario", "user", "session"])
               .agg(err_deg=(args.metric, "mean"), err_mm=("pog_err_mm", "mean"), frames=(args.metric, "size"))
               .reset_index())

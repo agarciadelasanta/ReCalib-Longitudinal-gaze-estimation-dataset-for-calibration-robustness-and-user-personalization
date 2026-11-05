@@ -17,9 +17,8 @@ Rules
     users     sorted original hashes -> user_00 .. (same order as previous releases)
     sessions  chronological per user -> session_XX_YY
     tasks     task 00 = calibration (session folder), 01.. = test tasks (sub-folders, chronological)
-    samples   sample id = acquisition image index (4 digits), so acquisition order is kept
-    discards  every sample is released; discarded ones carry discard_info. Frames identical
-              (MD5) to the previous frame of the same task are flagged DUPLICATE_FRAME (14).
+    samples   sample id = position of the frame in its task (4 digits, from 0001), in acquisition order
+    discards  every sample is released; discarded ones carry discard_info.
 
 Dry run by default (nothing is moved); add --execute to write the release. Execution is
 resumable: samples already moved are skipped.
@@ -46,9 +45,8 @@ DISCARD_REASONS = {
     1: "IMAGE_CANNOT_BE_LOADED", 2: "HPE_MODEL_ERROR", 3: "JSON_CANNOT_BE_LOADED", 4: "IMAGE_HAS_NOT_JSON",
     5: "LANDMARKS_OUT_OF_RANGE", 6: "OUTLIER", 7: "BLINK", 8: "BLINK_DETECTION_MODEL_ERROR",
     9: "POOR_IMAGE_QUALITY", 10: "LOW_EYE_ASPECT_RATIO", 11: "BAD_DETECTION",
-    12: "HIRU_COORDINATES_OUT_OF_RANGE", 13: "NOT_FIXATION", 14: "DUPLICATE_FRAME",
+    12: "HIRU_COORDINATES_OUT_OF_RANGE", 13: "NOT_FIXATION",
 }
-DUPLICATE_FRAME = 14
 SETUP_KEYS = ("posCam_mm", "rotCam", "screen_mm", "screen_pixels", "screen_zoom", "img_res", "screen_orientation")
 LANDMARK_IDS = ("4", "33", "61", "129", "133", "168", "263", "308", "358", "362",
                 "469", "470", "471", "472", "474", "475", "476", "477")
@@ -111,9 +109,9 @@ def plan(raw, discarded, workers):
                             start=datetime.strptime(task_dir.name, "%Y-%m-%dT%H_%M_%S").isoformat(),
                             raw_rel=str(rel), n_frames=len(frames))
                 tasks.append(task)
-                for idx in sorted(frames):
+                for pos, idx in enumerate(sorted(frames), 1):
                     png, js, flagged = frames[idx]
-                    sa = f"{idx:04d}"
+                    sa = f"{pos:04d}"
                     base = f"{u}_{s}_{t}_img-{sa}"
                     out_dir = Path(f"user_{u}", f"session_{u}_{s}", f"task_{u}_{s}_{t}")
                     samples.append(dict(task=task, sample_id=sa, raw_png=png, raw_json=js, flagged=flagged,
@@ -126,7 +124,7 @@ def plan(raw, discarded, workers):
     return users, tasks, samples
 
 
-def release_json(src, sample, duplicate):
+def release_json(src, sample):
     task = sample["task"]
     hp, gz = src.get("head_pose"), src.get("gaze")
     qa = (src.get("QualityAssuranceMetrics") or {}).get("2DLandmarksInfo")
@@ -136,8 +134,6 @@ def release_json(src, sample, duplicate):
 
     info = src.get("discard_info")
     code = int(info["discarding_reason"]) if info else 0
-    if duplicate and code == 0:
-        code = DUPLICATE_FRAME
     return {
         "image": sample["out_png"].name,
         "user_id": task["user_id"], "session_id": task["session_id"],
@@ -218,13 +214,6 @@ def main():
     print(f"planning from {args.raw} (+ {args.discarded}) ...")
     users, tasks, samples = plan(args.raw, args.discarded, args.workers)
 
-    # duplicates: identical to the previous frame of the same task
-    prev = {}
-    for s in samples:
-        key = id(s["task"])
-        s["duplicate"] = prev.get(key) == s["md5"]
-        prev[key] = s["md5"]
-
     # read all JSONs, check constants, build release documents
     setup_values, docs = {}, []
     for s in samples:
@@ -232,7 +221,7 @@ def main():
             src = json.load(fh)
         for k in SETUP_KEYS:
             setup_values.setdefault(k, set()).add(json.dumps(src.get(k), sort_keys=True))
-        docs.append(release_json(src, s, s["duplicate"]))
+        docs.append(release_json(src, s))
     varying = {k: v for k, v in setup_values.items() if len(v) != 1}
     if varying:
         raise RuntimeError(f"setup fields are not constant across the dataset: {sorted(varying)}")
@@ -248,7 +237,6 @@ def main():
         "tasks": len(tasks), "samples": len(samples),
         "kept": counts.get(0, 0), "discarded": len(samples) - counts.get(0, 0),
         "discard_counts": {DISCARD_REASONS.get(c, "KEPT") if c else "KEPT": n for c, n in sorted(counts.items())},
-        "duplicates_flagged": sum(s["duplicate"] for s in samples),
         "labelling_code_version": git_version(args.labelling_repo) if args.labelling_repo else "not recorded",
     }
     print(json.dumps(report, indent=2))
