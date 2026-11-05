@@ -16,7 +16,7 @@ All the code used to produce the released data is here, except the acquisition s
 | Folder | Contents |
 |---|---|
 | [`labelling/`](labelling/README.md) | Annotation of a sample from its image, the acquisition setup and the target position: landmarks, head pose, gaze vector and quality metrics. Re-running it on the released images reproduces the released annotations. Includes the per-participant face-scale factors and the validation on EVE |
-| [`dataset_conversion/`](dataset_conversion/README.md) | Conversion of the labelled recordings into the released layout, duplicate-frame removal, quality flags and summary files |
+| [`dataset_conversion/`](dataset_conversion/README.md) | Conversion of the labelled recordings into the released layout, quality flags and summary files |
 | [`visualization/`](visualization/README.md) | Inspection of a single sample (2D and 3D) and of the dataset distributions |
 | [`statistical_analysis/`](statistical_analysis/README.md) | Comparisons between participants, sessions and calibration/test tasks |
 | [`evaluation/`](evaluation/README.md) | Zero-shot evaluation and fine-tuning of ETH-XGaze under the reuse scenarios below. Uses the data, does not produce it |

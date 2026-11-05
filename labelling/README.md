@@ -72,7 +72,7 @@ On 200 random samples the labels are reproduced exactly. Landmarks, head rotatio
 | `quality_assurance_metrics` | extreme and mean normalized coordinates of the 478 landmarks, the relative area of their bounding box, and the eye aspect ratio of each eye (Soukupová & Čech, 2016) and their mean |
 | `discard_info` | `null`; only an image without a usable face (no face, or a required eye landmark outside the image) cannot be labelled and gets code 2 (`HPE_MODEL_ERROR`), as in the release |
 
-The coordinate frame is the camera frame in mm: +x towards the right of the image, +y downwards, +z away from the camera. Quality filtering (eye-aspect-ratio threshold, landmark plausibility) and duplicate-frame removal are part of the dataset preparation and are not applied here.
+The coordinate frame is the camera frame in mm: +x towards the right of the image, +y downwards, +z away from the camera. Quality filtering (eye-aspect-ratio threshold, landmark plausibility) is part of the dataset preparation and is not applied here.
 
 ## Face scale from several images of the same user
 

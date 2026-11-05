@@ -7,9 +7,11 @@ four eye-corner model points, `two_eye_center`) independently: dlib landmarks on
 ETH-XGaze, lies halfway between the eyes and the nose, so the eye centre is compared here instead.
 
     py evaluation/eth_origin_check.py <release root> --out eth_origin_check.csv [--n 5000] [--workers 8]
+    py evaluation/eth_origin_check.py <release root> --out eth_origin_check.csv --n 0 --discard-codes 0,10 --resume
 
-Samples random frames kept after quality filtering, writes one row per frame and prints the
-differences ETH - ReCalib (mm, and depth in %), overall and per user.
+Takes random labelled frames (--n 0: all of them; by default only frames kept after quality filtering),
+writes one row per frame and prints the differences ETH - ReCalib (mm, and depth in %), overall and
+per user. --resume keeps the rows already in --out and only processes the missing frames.
 """
 import argparse
 import csv
@@ -50,7 +52,8 @@ def eth_points(image):
 
 def process(args):
     root, row = args
-    out = dict(image=row["image"], user=row["user_id"], session=row["session_id"], task=row["task_id"], ok=0)
+    out = dict(image=row["image"], user=row["user_id"], session=row["session_id"], task=row["task_id"],
+               discard_code=row["discard_code"], ok=0)
     image = cv2.imread(str(root / row["image"]))
     pts = eth_points(image) if image is not None else None
     if pts is None:
@@ -63,8 +66,8 @@ def process(args):
 
 
 def summarize(rows):
-    ours = np.array([[r[f"ours_{a}"] for a in "xyz"] for r in rows])
-    eth = np.array([[r[f"eth_eye_{a}"] for a in "xyz"] for r in rows])
+    ours = np.array([[float(r[f"ours_{a}"]) for a in "xyz"] for r in rows])
+    eth = np.array([[float(r[f"eth_eye_{a}"]) for a in "xyz"] for r in rows])
     d = eth - ours
     depth_pct = 100 * d[:, 2] / ours[:, 2]
     q = lambda v: f"{np.median(v):+7.1f} [{np.percentile(v, 5):+7.1f}, {np.percentile(v, 95):+7.1f}]"
@@ -75,7 +78,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("release_root", type=Path)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--n", type=int, default=5000)
+    ap.add_argument("--n", type=int, default=5000, help="number of random frames; 0 = all")
+    ap.add_argument("--discard-codes", default="0", help="frames to use, by discard_code (0 kept, 10 flagged low EAR)")
+    ap.add_argument("--resume", action="store_true", help="keep the rows already in --out, process the rest")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--face-model", type=Path, default=EVAL_DIR / "face_model.txt")
@@ -84,17 +89,27 @@ def main():
     args = ap.parse_args()
 
     with open(args.release_root / "recalib_index.csv", newline="", encoding="utf-8") as fh:
-        rows = [r for r in csv.DictReader(fh) if r["discard_code"] == "0"]
-    random.Random(args.seed).shuffle(rows)
-    rows = rows[: args.n]
+        index = [r for r in csv.DictReader(fh) if r["discard_code"] in args.discard_codes.split(",")]
+    random.Random(args.seed).shuffle(index)
+    rows = index[: args.n] if args.n else index
 
-    columns = ["image", "user", "session", "task", "ok"] + [f"{p}_{a}" for p in ("ours", "eth_eye", "eth_face_center") for a in "xyz"]
+    results = []
+    if args.resume and args.out.exists():
+        codes = {r["image"]: r["discard_code"] for r in index}
+        with open(args.out, newline="", encoding="utf-8") as fh:
+            results = [dict(r, discard_code=r.get("discard_code") or codes.get(r["image"], "")) for r in csv.DictReader(fh)]
+        done = {r["image"] for r in results}
+        rows = [r for r in rows if r["image"] not in done]
+        print(f"resuming: {len(results)} frames already in {args.out}, {len(rows)} to do", flush=True)
+
+    columns = ["image", "user", "session", "task", "discard_code", "ok"] + [f"{p}_{a}" for p in ("ours", "eth_eye", "eth_face_center") for a in "xyz"]
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    results, start = [], time.time()
+    start = time.time()
     with open(args.out, "w", newline="", encoding="utf-8") as fh, \
             Pool(args.workers, _init, (args.face_model, args.shape_predictor, args.camera_npz)) as pool:
-        w = csv.DictWriter(fh, columns, restval="")
+        w = csv.DictWriter(fh, columns, restval="", extrasaction="ignore")
         w.writeheader()
+        w.writerows(results)
         # rows are written as they finish, so a stopped run keeps what it has done
         for n, res in enumerate(pool.imap_unordered(process, [(args.release_root, r) for r in rows], chunksize=4), 1):
             results.append(res)
@@ -103,11 +118,16 @@ def main():
                 fh.flush()
                 print(f"{n}/{len(rows)} frames, {time.time() - start:.0f} s", flush=True)
 
-    ok = [r for r in results if r["ok"]]
-    print(f"{len(ok)}/{len(results)} frames with a dlib face; ETH eye centre - ReCalib origin, median [p5, p95]:")
-    print("all  ", summarize(ok))
-    for user in sorted({r["user"] for r in ok}):
-        print(f"user {user}", summarize([r for r in ok if r["user"] == user]))
+    groups = {"kept frames (proper EAR, code 0)": {"0"}, "all labelled frames": set(args.discard_codes.split(","))}
+    if groups["all labelled frames"] == {"0"}:
+        del groups["all labelled frames"]
+    for title, codes in groups.items():
+        sel = [r for r in results if r["discard_code"] in codes]
+        ok = [r for r in sel if int(r["ok"])]
+        print(f"\n{title}: {len(ok)}/{len(sel)} frames with a dlib face; ETH eye centre - ReCalib origin, median [p5, p95]:")
+        print("all  ", summarize(ok))
+        for user in sorted({r["user"] for r in ok}):
+            print(f"user {user}", summarize([r for r in ok if r["user"] == user]))
 
 
 if __name__ == "__main__":

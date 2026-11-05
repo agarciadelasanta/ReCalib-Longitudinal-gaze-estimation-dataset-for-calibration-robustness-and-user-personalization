@@ -7,10 +7,9 @@ Scripts that turned the labelled acquisition output into the released dataset, p
 | Step | Script | What it does |
 |---|---|---|
 | 1 | `standardize_release.py` | Converts the labelled acquisition tree into the released layout (`user_XX/session_XX_YY/task_XX_YY_ZZ/XX_YY_ZZ_img-NNNN.{png,json}`), with `setup.json`, `sessions.csv` and `recalib_index.csv`. Discarded frames are kept and flagged. The table that links the pseudonymous user codes to `user_XX` stays private |
-| 2 | `drop_duplicates.py` | Removes frames whose image is identical to the preceding frame of the same task (no new camera image in a capture cycle) |
-| 3 | `apply_depth_scale.py` | Applies the per-participant face-scale factors (`labelling/user_depth_scale.csv`) to the gaze origin, gaze vector and head translation |
-| 4 | `apply_quality_flags.py` | Sets `discard_info` with the rules of the quality pipeline used for the release: code 2 (no face or landmarks), 5 (eye landmarks out of range or implausible face size) and 10 (mean eye aspect ratio below 0.05) |
-| 5 | `create_dataset_summary.py` | Writes the one-row-per-sample summary CSV used by the visualization and analysis tools |
+| 2 | `apply_depth_scale.py` | Applies the per-participant face-scale factors (`labelling/user_depth_scale.csv`) to the gaze origin, gaze vector and head translation |
+| 3 | `apply_quality_flags.py` | Sets `discard_info` with the rules of the quality pipeline used for the release: code 2 (no face or landmarks), 5 (eye landmarks out of range or implausible face size) and 10 (mean eye aspect ratio below 0.05) |
+| 4 | `create_dataset_summary.py` | Writes the one-row-per-sample summary CSV used by the visualization and analysis tools |
 
 ## Reproducing the annotations from the released images
 
