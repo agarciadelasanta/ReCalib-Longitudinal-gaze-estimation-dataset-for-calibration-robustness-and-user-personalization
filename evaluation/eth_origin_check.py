@@ -15,6 +15,7 @@ import argparse
 import csv
 import json
 import random
+import time
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -87,15 +88,20 @@ def main():
     random.Random(args.seed).shuffle(rows)
     rows = rows[: args.n]
 
-    with Pool(args.workers, _init, (args.face_model, args.shape_predictor, args.camera_npz)) as pool:
-        results = pool.map(process, [(args.release_root, r) for r in rows], chunksize=16)
-
     columns = ["image", "user", "session", "task", "ok"] + [f"{p}_{a}" for p in ("ours", "eth_eye", "eth_face_center") for a in "xyz"]
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "w", newline="", encoding="utf-8") as fh:
+    results, start = [], time.time()
+    with open(args.out, "w", newline="", encoding="utf-8") as fh, \
+            Pool(args.workers, _init, (args.face_model, args.shape_predictor, args.camera_npz)) as pool:
         w = csv.DictWriter(fh, columns, restval="")
         w.writeheader()
-        w.writerows(results)
+        # rows are written as they finish, so a stopped run keeps what it has done
+        for n, res in enumerate(pool.imap_unordered(process, [(args.release_root, r) for r in rows], chunksize=4), 1):
+            results.append(res)
+            w.writerow(res)
+            if n % 100 == 0 or n == len(rows):
+                fh.flush()
+                print(f"{n}/{len(rows)} frames, {time.time() - start:.0f} s", flush=True)
 
     ok = [r for r in results if r["ok"]]
     print(f"{len(ok)}/{len(results)} frames with a dlib face; ETH eye centre - ReCalib origin, median [p5, p95]:")
