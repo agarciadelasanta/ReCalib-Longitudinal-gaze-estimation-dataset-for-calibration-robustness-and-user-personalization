@@ -1,4 +1,4 @@
-# ReCalib pseudo-labelling
+# ReCalib geometric gaze labelling
 
 Stand-alone code that produces the ReCalib per-sample labels from the images, the acquisition setup and the screen targets. It reproduces the labelling step of the pipeline used for the released dataset, without its quality filtering.
 

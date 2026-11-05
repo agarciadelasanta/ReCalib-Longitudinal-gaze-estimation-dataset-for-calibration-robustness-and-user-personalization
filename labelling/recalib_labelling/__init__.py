@@ -1,4 +1,4 @@
-"""Stand-alone pseudo-labelling of ReCalib images (image + setup + screen target -> JSON)."""
+"""Stand-alone geometric gaze labelling of ReCalib images (image + setup + screen target -> JSON)."""
 from .labeller import Labeller, load_setup
 
 

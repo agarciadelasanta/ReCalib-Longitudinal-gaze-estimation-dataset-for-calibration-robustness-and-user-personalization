@@ -1,4 +1,4 @@
-"""Pseudo-labelling of one ReCalib image: image + setup + screen target -> release-format JSON.
+"""Geometric gaze labelling of one ReCalib image: image + setup + screen target -> release-format JSON.
 
 Reproduces the labelling step of the ReCalib pipeline (begibox ff8b084) without its quality
 filtering: MediaPipe FaceLandmarker landmarks and head pose, the head pose re-expressed in the
