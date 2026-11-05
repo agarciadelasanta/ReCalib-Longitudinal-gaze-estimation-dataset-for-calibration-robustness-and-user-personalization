@@ -2,9 +2,10 @@
 
 The column names and order match dataset_summary_recalib.csv and
 dataset_summary_targets.csv, consumed by statistical_analysis and visualization.
-Set DATASET_ROOT and OUTPUT_CSV_PATH below before running this script.
+    python statistical_analysis/create_csv_summary.py --root <dataset root> [--out dataset_summary_targets.csv]
 """
 
+import argparse
 import os
 import json
 import csv
@@ -12,11 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-# ================= CONFIGURATION =================
-DATASET_ROOT = r"D:\Mamu\Mamu"
-OUTPUT_CSV_PATH = "dataset_summary_targets.csv"
 MAX_WORKERS = os.cpu_count() * 2  # High performance multi-threading
-# =================================================
 
 # Standard MediaPipe landmark IDs used in your dataset
 LANDMARK_IDS = [4, 33, 61, 129, 133, 168, 263, 308, 358, 362, 469, 470, 471, 472, 474, 475, 476, 477]
@@ -155,10 +152,10 @@ def parse_complete_sample(json_path):
 
     return row
 
-def generate_complete_labels_csv():
-    base_dir = Path(DATASET_ROOT)
+def generate_complete_labels_csv(dataset_root, output_csv_path):
+    base_dir = Path(dataset_root)
     if not base_dir.exists():
-        print(f"❌ Error: Directory path {DATASET_ROOT} does not exist.")
+        print(f"❌ Error: Directory path {dataset_root} does not exist.")
         return
 
     print("🔍 Scanning directories for sample files...")
@@ -199,7 +196,7 @@ def generate_complete_labels_csv():
         rows = [r for r in results if r is not None]
 
     print("💾 Saving comprehensive master spreadsheet...")
-    out_path = Path(OUTPUT_CSV_PATH)
+    out_path = Path(output_csv_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     
     with open(out_path, 'w', newline='', encoding='utf-8') as f_out:
@@ -207,7 +204,11 @@ def generate_complete_labels_csv():
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"🎉 Done! Complete master matrix spreadsheet written ({len(rows)} samples) to:\n   {OUTPUT_CSV_PATH}")
+    print(f"🎉 Done! Complete master matrix spreadsheet written ({len(rows)} samples) to:\n   {output_csv_path}")
 
 if __name__ == "__main__":
-    generate_complete_labels_csv()
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root", required=True, help="dataset root folder")
+    ap.add_argument("--out", default="dataset_summary_targets.csv")
+    args = ap.parse_args()
+    generate_complete_labels_csv(args.root, args.out)

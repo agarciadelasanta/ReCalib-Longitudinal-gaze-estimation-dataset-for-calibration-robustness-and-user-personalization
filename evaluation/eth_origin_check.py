@@ -24,6 +24,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from dlib_model import ensure_shape_predictor
 from eth_xGaze_inf import dlib_eth_landmarks, estimateHeadPose, load_camera_npz, load_face_model
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -35,7 +36,7 @@ def _init(face_model_path, shape_predictor, camera_npz):
     cv2.setNumThreads(1)
     camera, distortion = load_camera_npz(camera_npz)
     _STATE.update(face_model=load_face_model(str(face_model_path)), camera=camera, distortion=distortion,
-                  detector=dlib.get_frontal_face_detector(), predictor=dlib.shape_predictor(str(shape_predictor)))
+                  detector=dlib.get_frontal_face_detector(), predictor=dlib.shape_predictor(ensure_shape_predictor(shape_predictor)))
 
 
 def eth_points(image):

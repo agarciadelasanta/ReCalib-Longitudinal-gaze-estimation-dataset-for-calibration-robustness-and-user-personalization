@@ -11,7 +11,7 @@ standardize_release.py:
     filter on discarded == False for the recommended subset
 
 Usage:
-    python create_dataset_summary.py --root F:/recalib_release/ReCalib --out dataset_summary_recalib.csv
+    python create_dataset_summary.py --root ReCalib --out dataset_summary_recalib.csv
 """
 import argparse
 import csv

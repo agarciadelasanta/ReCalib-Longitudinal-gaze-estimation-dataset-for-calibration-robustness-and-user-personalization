@@ -80,7 +80,8 @@ class ReCalibFrames(torch.utils.data.Dataset):
     def _dlib_landmarks(self, image):
         if self._dlib is None:
             import dlib
-            self._dlib = (dlib.get_frontal_face_detector(), dlib.shape_predictor(self.shape_predictor))
+            from dlib_model import ensure_shape_predictor
+            self._dlib = (dlib.get_frontal_face_detector(), dlib.shape_predictor(ensure_shape_predictor(self.shape_predictor)))
         return dlib_eth_landmarks(*self._dlib, image)
 
     def _landmarks(self, data, image):

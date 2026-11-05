@@ -17,7 +17,7 @@ from plotly.offline import get_plotlyjs
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CSV = REPO_ROOT / "dataset_summary.csv"
-DEFAULT_SETUP = REPO_ROOT / "docs" / "setup_config.json"
+DEFAULT_SETUP = REPO_ROOT / "docs" / "setup.json"
 DEFAULT_OUTPUT = REPO_ROOT / "temp" / "recalib_dataset_explorer.html"
 
 IDENTITY_COLUMNS = ["user_id", "session_id", "task_id", "task_type"]
@@ -127,6 +127,14 @@ def parse_args(argv=None):
 def read_screen_geometry(setup_path, parser):
     try:
         setup = json.loads(setup_path.read_text(encoding="utf-8"))
+        if "screen" in setup:
+            # setup.json of the release: physical pixels, no zoom to apply
+            screen = setup["screen"]
+            setup = {
+                "screen_mm": {"width": screen["width_mm"], "height": screen["height_mm"]},
+                "screen_pixels": {"width": screen["width_px"], "height": screen["height_px"]},
+                "screen_orientation": screen["orientation"],
+            }
         screen_mm = setup["screen_mm"]
         screen_pixels = setup["screen_pixels"]
         zoom = float(setup.get("screen_zoom", 1.0))
