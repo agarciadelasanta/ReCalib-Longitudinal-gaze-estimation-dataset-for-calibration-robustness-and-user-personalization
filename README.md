@@ -117,4 +117,5 @@ If you use the dataset or the code, please cite the dataset (the paper reference
 
 * **Code:** MIT License.
 * **Dataset:** ReCalib Data Usage Agreement; no Creative Commons licence applies to the restricted files.
-* **Open sample (`recalib_sample.tar`):** CC BY 4.0.
+* **Open Session (`recalib_sample.tar`):** CC BY 4.0.
+* **Open sample (`example\07_00_02_img-0039.png`):** CC BY 4.0.
