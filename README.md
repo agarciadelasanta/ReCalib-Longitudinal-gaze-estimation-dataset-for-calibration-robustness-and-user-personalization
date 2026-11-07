@@ -52,7 +52,6 @@ ReCalib/
 ├── recalib_index.csv                   # one row per sample (labels, flags)
 ├── sessions.csv                        # one row per task, with its date and time
 ├── incomplete_tasks.csv                # tasks with missing target points
-├── ethx_labels/                        # zero-shot ETH-XGaze predictions (baseline)
 ├── user_00/
 │   └── session_00_00/
 │       ├── task_00_00_00/              # 9-point calibration task
@@ -63,7 +62,7 @@ ReCalib/
 └── ...
 ```
 
-Each annotation holds the screen target (`pog_px`), the 3D gaze (`gaze`: origin between the eyes, target on the screen, unit vector; camera frame, mm), the head pose (`head_pose`: rotation, translation and 18 key landmarks), quality metrics, and `discard_info` for samples flagged by the quality pipeline (null otherwise). The paper's Data Records section and [`labelling/README.md`](labelling/README.md) describe every field.
+Each annotation holds the screen target (`pog_px`), the 3D gaze (`gaze`: origin between the eyes, target on the screen, unit vector; camera frame, mm), the same gaze origin and vector from the ETH-XGaze preprocessing (`gaze_eth_xgaze`: face centre and unit vector to the same target; null when its face detector fails), the head pose (`head_pose`: rotation, translation and 18 key landmarks), quality metrics, and `discard_info` for samples flagged by the quality pipeline (null otherwise). The paper's Data Records section and [`labelling/README.md`](labelling/README.md) describe every field.
 
 ## Reuse scenarios
 

@@ -1,9 +1,10 @@
-"""Screen intersections of the ReCalib gaze labels and the ETH-XGaze predictions, cast from one fixed point.
+"""Screen intersections of the ReCalib gaze vectors and the ETH-XGaze predictions, cast from one fixed point.
 
-    py evaluation/plot_label_consistency.py <release root> --out figure.pdf [--origin task | X Y Z]
+    py evaluation/plot_label_consistency.py <release root> --eth-pred eth_xgaze_labels.csv --out figure.pdf [--origin task | X Y Z]
 
-Both gaze vectors of each sample (the released gaze.vector and the ETH-XGaze prediction in
-ethx_labels/eth_xgaze_labels.csv) are cast from the same point and intersected with the screen plane
+Both gaze vectors of each sample (the released gaze.vector and the zero-shot ETH-XGaze model
+prediction, --eth-pred: the eth_xgaze_labels.csv written by the baseline evaluation, which is not part
+of the release) are cast from the same point and intersected with the screen plane
 (z = 0). Casting both from one point removes the differences between the two gaze origins, so only the
 directions are compared. The point is either fixed (--origin X Y Z, mm in the camera frame) or, with
 --origin task (default), the median ReCalib gaze origin of each calibration task, i.e. where the
@@ -48,6 +49,8 @@ def hit(origin, v):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("release_root", type=Path)
+    ap.add_argument("--eth-pred", type=Path, required=True,
+                    help="ETH-XGaze zero-shot predictions (eth_xgaze_labels.csv: image, ok, pred_vec_x/y/z)")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--origin", nargs="+", default=["task"], help="'task' or X Y Z in mm")
     ap.add_argument("--sessions", nargs="*", help="sessions to plot as UU_SS (default: one per user, first sessions)")
@@ -55,7 +58,7 @@ def main():
     args = ap.parse_args()
 
     fixed = None if args.origin == ["task"] else np.array([float(v) for v in args.origin])
-    eth = eth_vectors(args.release_root / "ethx_labels" / "eth_xgaze_labels.csv")
+    eth = eth_vectors(args.eth_pred)
     samples = defaultdict(list)                      # (user, session) -> [(target, ours vector, eth vector, ours origin)]
     with open(args.release_root / "recalib_index.csv", newline="", encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
@@ -121,7 +124,7 @@ def main():
         ax.set_ylabel("y (mm)", fontsize=7, color=MUTED)
     for ax in axes.flat[len(keys):]:
         ax.axis("off")
-    handles = [plt.Line2D([], [], ls="", marker="o", ms=4, c=OURS, label="ReCalib label"),
+    handles = [plt.Line2D([], [], ls="", marker="o", ms=4, c=OURS, label="ReCalib gaze vector"),
                plt.Line2D([], [], ls="", marker="o", ms=4, c=ETH, label="ETH-XGaze prediction"),
                plt.Line2D([], [], ls="", marker="o", ms=8, mfc="none", mew=1.0, c=INK, label="Target"),
                plt.Line2D([], [], c=MUTED, lw=0.8, label="Screen")]
