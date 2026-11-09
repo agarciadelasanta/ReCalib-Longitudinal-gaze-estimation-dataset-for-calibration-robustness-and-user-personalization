@@ -16,18 +16,18 @@ from plotly.offline import get_plotlyjs
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CSV = REPO_ROOT / "dataset_summary.csv"
+DEFAULT_CSV = REPO_ROOT / "recalib_index.csv"
 DEFAULT_SETUP = REPO_ROOT / "docs" / "setup.json"
 DEFAULT_OUTPUT = REPO_ROOT / "temp" / "recalib_dataset_explorer.html"
 
 IDENTITY_COLUMNS = ["user_id", "session_id", "task_id", "task_type"]
 OPTIONAL_COLUMNS = [
-    "head_rot_x",
-    "head_rot_y",
-    "head_rot_z",
-    "head_trans_x",
-    "head_trans_y",
-    "head_trans_z",
+    "head_rotation_rad_x",
+    "head_rotation_rad_y",
+    "head_rotation_rad_z",
+    "head_translation_mm_x",
+    "head_translation_mm_y",
+    "head_translation_mm_z",
     "pog_px_x",
     "pog_px_y",
 ]
@@ -285,12 +285,12 @@ def make_point_records(frame, max_points, screen):
         "session_id": "session",
         "task_id": "task",
         "task_type": "task_type",
-        "head_rot_x": "head_pitch",
-        "head_rot_y": "head_yaw",
-        "head_rot_z": "head_roll",
-        "head_trans_x": "head_translation_x",
-        "head_trans_y": "head_translation_y",
-        "head_trans_z": "head_translation_z",
+        "head_rotation_rad_x": "head_pitch",
+        "head_rotation_rad_y": "head_yaw",
+        "head_rotation_rad_z": "head_roll",
+        "head_translation_mm_x": "head_translation_x",
+        "head_translation_mm_y": "head_translation_y",
+        "head_translation_mm_z": "head_translation_z",
         "_target_key": "target_key",
     }
     point_frame = point_frame[list(columns)].rename(columns=columns)
@@ -511,8 +511,8 @@ def build_report(frame, args, screen):
               <th>Samples</th>
               <th>Tasks</th>
               <th>Targets</th>
-              <th>9-point</th>
-              <th>16-point</th>
+              <th>Calibration</th>
+              <th>Test</th>
             </tr></thead>
             <tbody id="session-table"></tbody>
           </table>
@@ -1189,8 +1189,8 @@ function renderTable(groups) {
     item.samples += row.count;
     item.tasks.add(row.task);
     if (row.target_key) item.targets.add(row.target_key);
-    if (row.task_type.toLowerCase().includes("9")) item.calibration += row.count;
-    if (row.task_type.toLowerCase().includes("16")) item.test += row.count;
+    if (row.task_type.toLowerCase() === "calibration") item.calibration += row.count;
+    if (row.task_type.toLowerCase() === "test") item.test += row.count;
   }
   const rows = [...sessions.values()].sort((a, b) => a.user - b.user || a.session - b.session);
   const body = document.getElementById("session-table");

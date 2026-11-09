@@ -9,6 +9,7 @@ from scene_2d_plots import trackingScreen2DPlotter
 from math import pi
 from utils import pog_converter_from_cm_2_px, pog_calc, Setup_specs
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 class Read_gaze_data:
     def __init__(self, pathImg, pathJson, crop_format=False):
@@ -201,7 +202,6 @@ class Read_gaze_data:
         # Pog Px -> Cam (using setup_specs instead of standalone Screen)
         Pogcm_screen = self.setup_specs.from_px_to_cm(self.pogPx_screen)
         self.pog_cm_cam = transformMhProws(self.setup_specs.Mcam_screen, Pogcm_screen)
-        self.pogPredictionPx_screen = pog_converter_from_cm_2_px(self.pogMm_cam, self.setup_specs)
 
     def rotationMatrixGen(self):
         ### Rotation matrix — use the transforms already computed by setup_specs
@@ -346,7 +346,7 @@ class Read_gaze_data:
             )
         )
 
-    def plot3D(self):
+    def plot3D(self, save_path=None):
         #Cam coordinate system
         example = trackingEnviroment3DPlotter()
         example.appendAxis(self.cameraAxis_cam, 'CameraAx')
@@ -381,7 +381,7 @@ class Read_gaze_data:
             for i, gaze_aux in enumerate(self.gaze_corrected_range):
                 example.appendInfGaze(self.eye3DCenter_cam, gaze_aux, f'InfGaze_corrected_range_{i}')
 
-        example.plot()
+        example.plot(save_path)
 
     def plot2D(self, write=False):
         ss = self.setup_specs
@@ -395,10 +395,28 @@ class Read_gaze_data:
 
         fig = example2D.plot()
 
-        if write:
+        if write is True:
             cv2.imwrite("img_2d.png", fig)
+            return
+
+        # the canvas is drawn in BGR: convert it so the colours match the legend
+        plt.figure()
+        plt.imshow(cv2.cvtColor(fig, cv2.COLOR_BGR2RGB))
+        handles = [
+            Line2D([], [], marker="o", linestyle="", markerfacecolor="none", markeredgecolor=(1, 20 / 255, 1), label="Target"),
+            Line2D([], [], marker="+", linestyle="", color=(20 / 255, 20 / 255, 1), label="Camera"),
+            Line2D([], [], color=(0, 1, 0), label="Screen"),
+        ]
+        if self.pogPredictionPx_screen.size > 0:
+            handles.insert(1, Line2D([], [], marker="o", linestyle="", markerfacecolor="none", markeredgecolor=(1, 1, 20 / 255), label="Prediction"))
+            g, p_ = np.ravel(self.gaze), np.ravel(self.gazePrediction)
+            err = np.degrees(np.arccos(np.clip(g @ p_ / (np.linalg.norm(g) * np.linalg.norm(p_)), -1, 1)))
+            plt.title(f"Prediction error: {err:.1f} deg, {math.dist(np.ravel(self.pogMm_cam), np.ravel(self.pogPrediction_cam)):.0f} mm on the screen")
+        plt.legend(handles=handles, loc="lower right", fontsize=8, facecolor="black", labelcolor="white")
+        if write:
+            plt.savefig(str(write), dpi=150, bbox_inches="tight")
+            plt.close()
         else:
-            imgplot = plt.imshow(fig)
             plt.show()
     
     @staticmethod

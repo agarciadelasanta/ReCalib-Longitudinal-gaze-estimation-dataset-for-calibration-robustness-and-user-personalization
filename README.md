@@ -11,7 +11,9 @@ Companion code of the **ReCalib** dataset: a longitudinal RGB gaze dataset for r
 
 ## Repository contents
 
-All the code used to produce the released data is here, except the acquisition software (it depends on the proprietary SDK of the infrared eye tracker used to supervise the recordings). Each folder has its own README.
+All the code used to produce the released data is here, except the source code of the acquisition software, which depends on the proprietary SDK of the infrared eye tracker used to supervise the recordings. Each folder has its own README.
+
+**Acquisition software.** The executable is available at [this download link](https://drive.google.com/file/d/1dq_x0J7ezRWT-JOvCygOHlqAbBooDrYS/view?usp=drive_link). Running it requires an Irisbond Hiru eye tracker and a licensed copy of the Hiru SDK DLL, which is not included and is not freely available, so the point acceptance applied during acquisition cannot be reproduced without them. The post-acquisition steps (annotation and quality flags) do not depend on the SDK and can be reproduced with the code in this repository.
 
 | Folder | Contents |
 |---|---|
@@ -22,7 +24,7 @@ All the code used to produce the released data is here, except the acquisition s
 | [`evaluation/`](evaluation/README.md) | Zero-shot evaluation and fine-tuning of ETH-XGaze under the reuse scenarios below. Uses the data, does not produce it |
 | `example/` | One image with its annotation (`07_00_02_img-0039`), identical to the released sample, to try the labelling, the single-sample visualization and the ETH-XGaze model without downloading the dataset |
 | `docs/` | Landmark indices, discard codes, camera calibration and other reference files |
-| `dataset_summary.csv` | One row per released sample (labels and flags, no images), used by the visualization tools |
+| `recalib_index.csv` | One row per released sample (labels and flags, no images), identical to the index file of the released dataset; used by the visualization tools |
 
 ## Installation
 

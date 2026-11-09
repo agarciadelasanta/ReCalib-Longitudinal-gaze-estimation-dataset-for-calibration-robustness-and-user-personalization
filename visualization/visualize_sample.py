@@ -67,6 +67,11 @@ def build_parser():
         help="Torch device for optional inference: auto, cpu, cuda, etc.",
     )
     parser.add_argument(
+        "--save-dir",
+        type=Path,
+        help="Write the image overlay, 2D screen view and 3D view to this folder instead of displaying them.",
+    )
+    parser.add_argument(
         "--no-display",
         action="store_true",
         help="Validate and reconstruct the sample without opening interactive windows.",
@@ -146,6 +151,16 @@ def main(argv=None):
         print("Validated bundled sample.")
     else:
         print("Validated sample.")
+
+    if args.save_dir is not None:
+        out = args.save_dir.expanduser().resolve()
+        out.mkdir(parents=True, exist_ok=True)
+        overlay_visualization(str(args.png_path), str(args.json_path), pred_vector=gaze_prediction,
+                              save_path=out / "sample_overlay_visualization.png")
+        gaze_reader.plot2D(write=out / "2d_sample_visualization.png")
+        gaze_reader.plot3D(save_path=out / "3d_sample_visualization.png")
+        print(f"Views written to {out}")
+        return
 
     if args.no_display:
         return
