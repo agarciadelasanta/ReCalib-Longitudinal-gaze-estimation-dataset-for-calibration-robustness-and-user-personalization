@@ -1,5 +1,11 @@
 import numpy as np
 
+# Midpoint of the eye corners (33, 133, 263, 362) of MediaPipe's canonical face in its own frame, mm
+# (OpenCV axes). The released head translation is the origin of that face and the gaze origin is this
+# point placed with the head pose and the participant's face scale.
+CANONICAL_EYE_MIDPOINT_MM = np.array([0.0, -26.25, -34.66])
+
+
 def load_head_model():
     head = np.array([[6.56, -3.2, 6.921],
                      [6.56, -1.6, 6.507],

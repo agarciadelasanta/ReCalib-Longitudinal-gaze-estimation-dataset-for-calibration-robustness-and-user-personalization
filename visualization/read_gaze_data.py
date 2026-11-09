@@ -3,7 +3,7 @@ import json
 import math
 import numpy as np
 from scene_operations import Plane, rotateVector, createBothRotMat, transformMhProws, computeCameraMatrix, projectPoints
-from head_model import load_head_model
+from head_model import load_head_model, CANONICAL_EYE_MIDPOINT_MM
 from scene_3d_plots import trackingEnviroment3DPlotter
 from scene_2d_plots import trackingScreen2DPlotter
 from math import pi
@@ -50,6 +50,8 @@ class Read_gaze_data:
             self.posCam_mm = camera["position_mm"]
             self.data["rotCam"] = camera["rotation_rad"]
             self.img_res = setup_data["image_resolution_px"]
+            factors = setup_data.get("user_face_scale", {}).get("factors", {})
+            self.face_scale = float(factors.get(str(self.data.get("user_id", "")), 1.0))
             return
 
         # Legacy setup_config.json - set defaults if not present
@@ -114,6 +116,7 @@ class Read_gaze_data:
         self.pogPrediction_cam = []
         self.eye3DPredictionCenter_cam = []
         self.pogPredictionPx_screen = np.array([])
+        self.face_scale = 1.0
 
     def loadJSONData(self):
         """
@@ -278,7 +281,10 @@ class Read_gaze_data:
 
     def headSetup(self):
         # Head model
+        # The 68-point model has its own origin: move it so that its eyes sit where the labels put
+        # them (canonical-face eye midpoint, scaled like the released translation and gaze origin)
         head3D_head = load_head_model()*10
+        head3D_head = head3D_head - head3D_head[36:48].mean(axis=0) + self.face_scale * CANONICAL_EYE_MIDPOINT_MM
         self.head3D_cam = transformMhProws(self.Mhead_cam, head3D_head)
 
     def addHeadPrediction(self, predictionHead3D_cam, predictionMhead_cam, predictionVRhead_cam, predictionVThead_cam):

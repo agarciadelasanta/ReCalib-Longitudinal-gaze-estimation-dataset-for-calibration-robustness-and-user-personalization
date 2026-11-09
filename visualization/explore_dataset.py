@@ -285,9 +285,10 @@ def make_point_records(frame, max_points, screen):
         "session_id": "session",
         "task_id": "task",
         "task_type": "task_type",
-        "head_rotation_rad_x": "head_pitch",
+        # rotation_rad holds extrinsic Euler 'zyx' angles [roll, yaw, pitch] (docs/setup.json)
+        "head_rotation_rad_x": "head_roll",
         "head_rotation_rad_y": "head_yaw",
-        "head_rotation_rad_z": "head_roll",
+        "head_rotation_rad_z": "head_pitch",
         "head_translation_mm_x": "head_translation_x",
         "head_translation_mm_y": "head_translation_y",
         "head_translation_mm_z": "head_translation_z",
@@ -721,7 +722,7 @@ function themeLayout(extra = {}) {
 
 function axisStyle(title) {
   const border = getComputedStyle(document.documentElement).getPropertyValue("--border").trim();
-  return { title, gridcolor: border, zerolinecolor: border };
+  return { title: { text: title }, gridcolor: border, zerolinecolor: border };
 }
 
 const plotConfig = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
@@ -768,20 +769,21 @@ function renderSessionChart(groups) {
       type: "scatter",
       mode: "markers",
       name: label,
-      x: rows.map(row => row.session),
+      // tasks of the same session side by side, so that none hides another
+      x: rows.map(row => row.session + (index - (tasks.length - 1) / 2) * 0.2),
       y: rows.map(row => `User ${String(row.user).padStart(2, "0")}`),
-      customdata: rows.map(row => row.count),
+      customdata: rows.map(row => [row.count, row.session]),
       marker: {
         color: taskColors[index % taskColors.length],
-        size: rows.map(row => Math.max(7, Math.min(26, Math.sqrt(row.count) / 1.6))),
+        size: rows.map(row => Math.max(4, Math.min(9, Math.sqrt(row.count) / 2.5))),
         opacity: 0.76
       },
-      hovertemplate: "Session %{x}<br>%{y}<br>%{customdata:,} samples<extra>" + label + "</extra>"
+      hovertemplate: "Session %{customdata[1]}<br>%{y}<br>%{customdata[0]:,} samples<extra>" + label + "</extra>"
     };
   });
   Plotly.react("session-chart", traces, themeLayout({
     xaxis: { ...axisStyle("Session ID"), dtick: 1 },
-    yaxis: { title: "Participant", automargin: true },
+    yaxis: { title: { text: "Participant" }, automargin: true },
     legend: { orientation: "h", y: 1.18 },
     margin: { l: 82, r: 20, t: 64, b: 52 }
   }), plotConfig);
@@ -890,7 +892,7 @@ function renderHeadDistributions(points) {
   }));
   Plotly.react(target, traces, themeLayout({
     boxmode: "group",
-    xaxis: { title: "Task", automargin: true },
+    xaxis: { title: { text: "Task" }, automargin: true },
     yaxis: axisStyle("Head rotation (°)"),
     legend: { orientation: "h", y: 1.08 },
     margin: { l: 62, r: 18, t: 48, b: 78 }
@@ -1053,7 +1055,7 @@ function renderTranslationDistributions(points) {
   }));
   Plotly.react(target, traces, themeLayout({
     boxmode: "group",
-    xaxis: { title: "Task", automargin: true },
+    xaxis: { title: { text: "Task" }, automargin: true },
     yaxis: axisStyle("Head translation (cm)"),
     legend: { orientation: "h", y: 1.08 },
     margin: { l: 68, r: 18, t: 48, b: 78 }

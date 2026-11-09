@@ -108,6 +108,8 @@ def main(argv=None) -> int:
     ap.add_argument("--index", required=True, type=Path)
     ap.add_argument("--user", default="05")
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--setup", type=Path,
+                    help="setup.json (default: next to --index as in the release, else docs/setup.json)")
     args = ap.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
     d = load(args.index, args.user)
@@ -118,7 +120,10 @@ def main(argv=None) -> int:
     two_tasks(d, "tx", "ty", "head x (mm)", "head y (mm)", n("hpe_t_x_vs_hpe_t_y"), invert_y=True)
     two_tasks(d, "tx", "tz", "head x (mm)", "head z (mm)", n("hpe_t_x_vs_hpe_t_z"))
     # (e): gaze rays from the median origin on the screen plane, screen outline from setup.json
-    setup = json.loads((args.index.parent / "setup.json").read_text())
+    setup_path = args.setup or args.index.parent / "setup.json"
+    if not setup_path.is_file():
+        setup_path = Path(__file__).resolve().parents[1] / "docs" / "setup.json"
+    setup = json.loads(setup_path.read_text())
     scr, cam = setup["screen"], setup["camera"]["position_mm"]
     fig, ax = plt.subplots(figsize=(6, 5))
     kde(ax, d[d.task_type == "test"], "pog_x", "pog_y", TEST, "test")

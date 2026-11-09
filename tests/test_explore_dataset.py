@@ -28,13 +28,13 @@ class ExploreDatasetTest(unittest.TestCase):
                 "user_id": [7, 7, 7],
                 "session_id": [1, 1, 1],
                 "task_id": [0, 1, 1],
-                "task_type": ["9-point", "16-point", "16-point"],
-                "head_rot_x": [0.0, math.pi / 6, math.pi / 4],
-                "head_rot_y": [math.pi / 2, 0.0, -math.pi / 6],
-                "head_rot_z": [0.0, -math.pi / 4, math.pi / 6],
-                "head_trans_x": [-20.0, 10.0, 30.0],
-                "head_trans_y": [40.0, 50.0, 60.0],
-                "head_trans_z": [300.0, 320.0, 340.0],
+                "task_type": ["calibration", "test", "test"],
+                "head_rotation_rad_x": [0.0, math.pi / 6, math.pi / 4],
+                "head_rotation_rad_y": [math.pi / 2, 0.0, -math.pi / 6],
+                "head_rotation_rad_z": [0.0, -math.pi / 4, math.pi / 6],
+                "head_translation_mm_x": [-20.0, 10.0, 30.0],
+                "head_translation_mm_y": [40.0, 50.0, 60.0],
+                "head_translation_mm_z": [300.0, 320.0, 340.0],
                 "pog_px_x": [1368, 10, 10],
                 "pog_px_y": [912, 10, 10],
             }
@@ -60,8 +60,9 @@ class ExploreDatasetTest(unittest.TestCase):
         self.assertAlmostEqual(center["target_cm_x"], 13.0)
         self.assertAlmostEqual(center["target_cm_y"], 8.65)
         self.assertEqual(repeated["count"], 2)
-        self.assertAlmostEqual(points[1]["head_pitch"], 30.0)
-        self.assertAlmostEqual(points[1]["head_roll"], -45.0)
+        # rotation_rad = Euler zyx [roll, yaw, pitch]: x is roll, z is pitch
+        self.assertAlmostEqual(points[1]["head_roll"], 30.0)
+        self.assertAlmostEqual(points[1]["head_pitch"], -45.0)
         self.assertAlmostEqual(points[1]["head_translation_x"], 1.0)
         self.assertAlmostEqual(points[1]["head_translation_z"], 32.0)
 

@@ -34,7 +34,9 @@ def load_gaze_analysis_params(params_path: str) -> dict:
 # ------------------ GEOMETRY FUNCTIONS ----------------------
 # ============================================================
 
-def intersect_gaze(gaze, P0=np.array([0.0, 0.0, 40.0])):
+def intersect_gaze(gaze, P0=np.array([0.0, 0.0, 400.0])):
+    # Point where the ray from P0 along gaze meets the camera plane z = 0 (mm). The default P0 is a
+    # fixed eye 400 mm in front of the camera, which removes head position ("normalized" PoG).
     V0 = np.array([0, 0, 0], dtype=float)
     n = np.array([0, 0, 1], dtype=float)
     gaze = np.asarray(gaze, dtype=float).flatten()
@@ -204,6 +206,8 @@ def plot_vs_coverage_smooth(df: pd.DataFrame, x_var: str, y_var: str, x_lim=None
     ax.set_ylabel(y_var, fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=23)
     ax.grid(True, linestyle='--', alpha=0.3)
+    if x_lim: ax.set_xlim(x_lim[0], x_lim[1])
+    if y_lim: ax.set_ylim(y_lim[0], y_lim[1])
     fig.tight_layout()
 
 def plot_hpe_histograms(df: pd.DataFrame, xlims_by_suffix=None, id_user=None):
@@ -399,7 +403,7 @@ def analyze(args):
             plot_vs_coverage_smooth(df, "hpe_r_x", "hpe_r_y", x_lim=x_axis_hpe_r_lim, y_lim=y_axis_hpe_r_lim, split_plot_type="task_type", title="Overall Coverage - HPE_r X vs Y")
             plot_vs_coverage_smooth(df, "hpe_r_x", "hpe_r_z", x_lim=x_axis_hpe_r_lim, y_lim=z_axis_hpe_r_lim, split_plot_type="task_type", title="Overall Coverage - HPE_r X vs Z")
             plot_vs_coverage_smooth(df, "gaze_vector_x", "gaze_vector_y", x_lim=x_axis_ge_lim, y_lim=y_axis_ge_lim, split_plot_type="task_type", title="Overall Coverage - Gaze Vector X vs Y")
-            plot_vs_coverage_smooth(df, "pog_norm_x", "pog_norm_y", x_lim=x_axis_ge_lim, y_lim=y_axis_ge_lim, split_plot_type="task_type", title="Overall Coverage - POG Normalized X vs Y")
+            plot_vs_coverage_smooth(df, "pog_norm_x", "pog_norm_y", x_lim=x_axis_pog_norm_lim, y_lim=y_axis_pog_norm_lim, split_plot_type="task_type", title="Overall Coverage - POG Normalized X vs Y")
 
     if args.export_dir:
         os.makedirs(args.export_dir, exist_ok=True)
