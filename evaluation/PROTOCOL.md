@@ -67,6 +67,18 @@ python evaluation/summarize_protocol.py --runs runs/out --out runs/summary
 
 This writes `scenarios.csv`, `users.csv`, `contrasts.csv` (paired gains, % of sessions improved, Wilcoxon p over sessions and over users, 95% CI from resampling users and then sessions), `sessions.csv`, `curve.csv` and `report.md`.
 
+## Cross-session check
+
+Calibrates the model on one session (the `calib` fold of that session, same training) and scores it on the test tasks of every session of the same user. This gives one row of the user's session × session error matrix.
+
+```bash
+python evaluation/cross_session_eval.py --manifest runs/folds_all.json --out-dir runs/cross --list
+python evaluation/cross_session_eval.py --manifest runs/folds_all.json --out-dir runs/cross --index 0
+python evaluation/summarize_cross_session.py --runs runs/cross --sessions-csv ReCalib/sessions.csv --out runs/cross/summary
+```
+
+Run one `--index` per process; a session whose `pairs/u<user>_s<session>.csv` exists is skipped. The calibrated model is deleted after scoring unless `--keep-model`. The summary compares the same-session error with the mean error on the user's other sessions, using the same statistics as `summarize_protocol.py`. It also groups the error by days between the two sessions (from `sessions.csv`) and gives per-user correlations of error with days apart. About 1.5 min per session on one GPU, 4.5 h for all 186.
+
 ## Cost per fold (about 800 frames per session)
 
 | Scenario | Training frames | Folds |

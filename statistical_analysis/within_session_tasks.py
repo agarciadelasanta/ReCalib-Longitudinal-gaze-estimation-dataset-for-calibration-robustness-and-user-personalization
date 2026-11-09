@@ -11,8 +11,11 @@ three test tasks (01-03):
 Head rotation uses the released Euler angles (rotation_rad = [roll, yaw, pitch]) in degrees;
 position uses the gaze origin (midpoint between the eyes, mm).
 
-Outputs (in --out): per_session_metrics.csv, per_user_metrics.csv, statistical_tests.csv,
-within_session_tasks.png/.pdf
+Per participant (Table 5 of the paper): yaw and pitch range, eye-camera distance range, and median and
+SD over sessions of the change of the median head pose between sessions and from calibration to test.
+
+Outputs (in --out): per_session_metrics.csv, per_user_metrics.csv, per_user_table5.csv,
+statistical_tests.csv, within_session_tasks.png/.pdf
 
 Usage:
     python within_session_tasks.py --index ReCalib/recalib_index.csv --out temp/within_session
@@ -89,6 +92,38 @@ def session_metrics(k):
     s = pd.DataFrame(rows)
     s["t1_ratio"] = s.shift_rot_t1 / s.shift_rot_t23
     return s
+
+
+def participant_metrics(k, S):
+    """Per-participant columns of the paper's Table 5 that need a spread (sessions in S only).
+
+    between task types: shift of the median head pose from calibration to test (per session, as in S);
+    between sessions: distance between each session's median head pose and the participant's median
+    pose. Both as median and SD over sessions (rotation in degrees, position in mm). Also the
+    5th-95th percentile range of yaw and pitch and 5th-95th percentiles of the eye-camera distance.
+    """
+    k = k.merge(S[["user_id", "session_id"]], on=["user_id", "session_id"])
+    dist = np.linalg.norm(k[POS].to_numpy(), axis=1)
+    ses = k.groupby(["user_id", "session_id"])[ROT + POS].median().reset_index()
+    ref = ses.groupby("user_id")[ROT + POS].transform("median")
+    ses["between_rot"] = np.linalg.norm(ses[ROT].to_numpy() - ref[ROT].to_numpy(), axis=1)
+    ses["between_pos"] = np.linalg.norm(ses[POS].to_numpy() - ref[POS].to_numpy(), axis=1)
+    ses = ses.merge(S[["user_id", "session_id", "shift_rot", "shift_pos"]], on=["user_id", "session_id"])
+
+    def row(sg, d, g):
+        out = {"sessions": len(sg)}
+        for a in ("yaw", "pitch"):
+            lo, hi = np.percentile(g[a], [5, 95])
+            out[f"{a}_range"] = hi - lo
+        for c in ("shift_rot", "shift_pos", "between_rot", "between_pos"):
+            out[f"{c}_median"], out[f"{c}_sd"] = sg[c].median(), sg[c].std()
+        out["dist_p05"], out["dist_p95"] = np.percentile(d, [5, 95])
+        return out
+
+    P = pd.DataFrame({u: row(ses[ses.user_id == u], dist[(k.user_id == u).to_numpy()], k[k.user_id == u])
+                      for u in sorted(ses.user_id.unique())}).T
+    P.loc["all"] = row(ses, dist, k)
+    return P
 
 
 def tests_table(S):
@@ -187,6 +222,9 @@ def main():
     keys = [c[0] for c in COLUMNS]
     pd.concat([U, all_row])[keys + ["shift_rot_t1", "shift_rot_t23", "shift_pos_t1", "shift_pos_t23",
                                     "test_test_pos", "test1_rot_spread"]].to_csv(args.out / "per_user_metrics.csv")
+
+    P = participant_metrics(k, S)
+    P.to_csv(args.out / "per_user_table5.csv")
 
     T = tests_table(S)
     T.to_csv(args.out / "statistical_tests.csv", index=False)

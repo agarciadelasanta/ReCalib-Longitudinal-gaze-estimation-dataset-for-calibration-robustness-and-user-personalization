@@ -9,6 +9,10 @@ standardize_release.py:
   * attr_* columns are left empty: participant attributes are not part of the release
   * discarded samples are included (discarded / discard_code / discard_reason columns);
     filter on discarded == False for the recommended subset
+  * gaze_eth_xgaze (gaze origin = ETH-XGaze face centre, and the vector from it to the same target)
+    is appended as gaze_eth_xgaze_vector_* / gaze_eth_xgaze_origin_*; empty when null
+  * --eth-csv optionally appends the ETH-XGaze zero-shot model predictions (eth_xgaze_labels.csv
+    from the baseline evaluation; not part of the release)
 
 Usage:
     python create_dataset_summary.py --root ReCalib --out dataset_summary_recalib.csv
@@ -40,7 +44,10 @@ FIELDNAMES = [
     "qa_head_bbox_surface", "qa_ear_left", "qa_ear_right",
     "img_res_width", "img_res_height", "screen_width_px", "screen_height_px",
     "attr_gender", "attr_age", "attr_distance", "attr_contacts",
-] + [f"lm_{i}_{a}" for i in LANDMARK_IDS for a in "xy"] + ["discarded", "discard_code", "discard_reason"]
+] + [f"lm_{i}_{a}" for i in LANDMARK_IDS for a in "xy"] + ["discarded", "discard_code", "discard_reason"] + [
+    "gaze_eth_xgaze_vector_x", "gaze_eth_xgaze_vector_y", "gaze_eth_xgaze_vector_z",
+    "gaze_eth_xgaze_origin_x", "gaze_eth_xgaze_origin_y", "gaze_eth_xgaze_origin_z",
+]   # appended at the end, so tools that rely on the column order keep working
 
 
 def xyz(values):
@@ -56,6 +63,7 @@ def parse_sample(json_path, setup):
         return None
     pog = d.get("pog_px") or {}
     gz = d.get("gaze") or {}
+    ge = d.get("gaze_eth_xgaze") or {}
     hp = d.get("head_pose") or {}
     qa = d.get("quality_assurance_metrics") or {}
     st = qa.get("landmark_statistics_2d") or {}
@@ -82,7 +90,8 @@ def parse_sample(json_path, setup):
     })
     for prefix, values in (("gaze_vector", gz.get("vector")), ("gaze_origin", gz.get("origin_mm")),
                            ("gaze_pog", gz.get("pog_mm")), ("head_rot", hp.get("rotation_rad")),
-                           ("head_trans", hp.get("translation_mm"))):
+                           ("head_trans", hp.get("translation_mm")),
+                           ("gaze_eth_xgaze_vector", ge.get("vector")), ("gaze_eth_xgaze_origin", ge.get("origin_mm"))):
         for axis, v in zip("xyz", xyz(values)):
             row[f"{prefix}_{axis}"] = v
     mesh = hp.get("mediapipe_face_mesh_2d") or {}
@@ -93,7 +102,7 @@ def parse_sample(json_path, setup):
     return row
 
 
-ETH_COLUMNS = {  # eth_xgaze_labels.csv column -> summary column
+ETH_COLUMNS = {  # eth_xgaze_labels.csv (zero-shot predictions, --eth-csv) column -> summary column
     "ok": "eth_ok", "fail_reason": "eth_fail_reason", "pred_pitch": "eth_pred_pitch", "pred_yaw": "eth_pred_yaw",
     "pred_vec_x": "eth_pred_vec_x", "pred_vec_y": "eth_pred_vec_y", "pred_vec_z": "eth_pred_vec_z",
     "face_center_x": "eth_face_center_x", "face_center_y": "eth_face_center_y", "face_center_z": "eth_face_center_z",
@@ -173,7 +182,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True, type=Path, help="release root (contains setup.json and user_XX)")
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--eth-csv", type=Path, help="ETH-XGaze baseline labels (eth_xgaze_labels.csv) to append")
+    ap.add_argument("--eth-csv", type=Path, help="optional: ETH-XGaze zero-shot predictions (eth_xgaze_labels.csv from the "
+                    "baseline evaluation, not part of the release) to append")
     ap.add_argument("--workers", type=int, default=(os.cpu_count() or 4) * 2)
     args = ap.parse_args()
 

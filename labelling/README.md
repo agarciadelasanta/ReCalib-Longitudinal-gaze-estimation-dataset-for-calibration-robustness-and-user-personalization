@@ -1,6 +1,6 @@
-# ReCalib geometric gaze labelling
+# ReCalib geometric gaze reconstruction
 
-Stand-alone code that produces the ReCalib per-sample labels from the images, the acquisition setup and the screen targets. It reproduces the labelling step of the pipeline used for the released dataset, without its quality filtering.
+Stand-alone code that produces the ReCalib per-sample annotations (gaze origin, gaze vector, head pose, landmarks) from the images, the acquisition setup and the screen targets. It reproduces this step of the pipeline used for the released dataset, without its quality filtering. The ground truth of the dataset is the screen target (`pog_px`, `pog_mm`); the gaze origin is an estimate of this method, and the gaze vector is the line from it to the target.
 
 ```
 image (PNG/JPG) + setup.json + pog_px  ->  JSON annotation (release schema)
@@ -9,7 +9,7 @@ image (PNG/JPG) + setup.json + pog_px  ->  JSON annotation (release schema)
 There are two methods, which differ only in the depth of the head and gaze origin:
 
 1. **One image.** The face is assumed to have the size of MediaPipe's canonical face.
-2. **Several images of the same user.** The user's face size is estimated from the iris size over all of their images, and applied as a per-user factor (near 1) to the depth. This is how the ReCalib labels were made; the factors are in [`user_depth_scale.csv`](user_depth_scale.csv).
+2. **Several images of the same user.** The user's face size is estimated from the iris size over all of their images, and applied as a per-user factor (near 1) to the depth. This is how the released gaze origins were made; the factors are in [`user_depth_scale.csv`](user_depth_scale.csv).
 
 ## Installation
 
@@ -94,7 +94,7 @@ python -m recalib_labelling.face_scale --labels labels_one_image.csv --setup ReC
 |---|---|---|---|---|---|---|---|---|---|
 | Factor | 0.998 | 1.040 | 0.997 | 0.976 | 1.017 | 1.013 | 1.032 | 0.984 | 1.027 |
 
-**Validation on EVE** (`validation/`): the labelling was applied unchanged to 39,724 frames of 44 EVE participants, whose 3D eye positions come from a face model scaled per person with a calibrated multi-camera rig. Agreement with EVE:
+**Comparison with EVE** (`validation/`): the reconstruction was applied unchanged to 39,724 frames of 44 EVE participants, whose 3D eye positions come from a face model scaled per person with a calibrated multi-camera rig. Neither is ground truth; the difference between the two gaze origins is mostly constant per participant (0.15° median on the gaze vector once each participant's offset is removed). Difference from EVE:
 
 | | One image | Several images (per-user face scale) |
 |---|---|---|
