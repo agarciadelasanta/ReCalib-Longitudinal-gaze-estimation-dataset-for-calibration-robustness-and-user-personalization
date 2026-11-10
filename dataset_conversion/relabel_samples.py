@@ -1,11 +1,11 @@
-"""Relabel released samples in place with labelling/, keeping their quality flags.
+"""Relabel released samples in place with 3d_reconstruction/, keeping their quality flags.
 
     python dataset_conversion/relabel_samples.py --release-root ReCalib --codes 10 \
         --backup backup_relabel_code10 [--write]
 
 For every sample of recalib_index.csv whose discard code is in --codes, the gaze, head_pose and
-quality_assurance_metrics blocks of its JSON are regenerated with labelling/recalib_labelling (with the
-user's face-scale factor from labelling/user_depth_scale.csv), as for the rest of the release.
+quality_assurance_metrics blocks of its JSON are regenerated with 3d_reconstruction/recalib_reconstruction (with the
+user's face-scale factor from 3d_reconstruction/user_depth_scale.csv), as for the rest of the release.
 discard_info, identifiers and target are kept. The matching recalib_index.csv rows are updated.
 
 Used for the 249 low-EAR samples (code 10), whose QA block came from an earlier landmark run (110 of
@@ -21,9 +21,9 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labelling"))
-from recalib_labelling import Labeller  # noqa: E402
-from recalib_labelling.face_scale import RECALIB_FACTORS, load_factors  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "3d_reconstruction"))
+from recalib_reconstruction import Labeller  # noqa: E402
+from recalib_reconstruction.face_scale import RECALIB_FACTORS, load_factors  # noqa: E402
 
 BLOCKS = ("gaze", "head_pose", "quality_assurance_metrics")
 

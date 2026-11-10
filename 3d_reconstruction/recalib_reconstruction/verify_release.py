@@ -1,6 +1,6 @@
 """Relabel release samples and compare with the released JSON files.
 
-    python -m recalib_labelling.verify_release --release-root <ReCalib> [--n 200] [--seed 0]
+    python -m recalib_reconstruction.verify_release --release-root <ReCalib> [--n 200] [--seed 0]
 
 Picks random samples from recalib_index.csv, labels each image with this package and reports
 the largest differences per field (angles in degrees, positions in mm, landmarks in pixels).

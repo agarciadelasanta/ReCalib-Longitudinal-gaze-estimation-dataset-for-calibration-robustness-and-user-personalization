@@ -25,8 +25,8 @@ import h5py
 import mediapipe as mp
 import numpy as np
 
-from recalib_labelling.geometry import eye_midpoint_cam, head_pose_from_mediapipe
-from recalib_labelling.labeller import REQUIRED_LANDMARKS, Labeller
+from recalib_reconstruction.geometry import eye_midpoint_cam, head_pose_from_mediapipe
+from recalib_reconstruction.labeller import REQUIRED_LANDMARKS, Labeller
 
 COLUMNS = ["recording", "frame", "fx", "fy",
            "gt_x", "gt_y", "gt_z", "ours_x", "ours_y", "ours_z", "target_x", "target_y", "target_z",

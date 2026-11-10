@@ -17,16 +17,16 @@ There are two methods, which differ only in the depth of the head and gaze origi
 pip install -r requirements.txt
 ```
 
-The MediaPipe FaceLandmarker model (`face_landmarker.task`, Apache-2.0) is downloaded from Google on first use and cached in `~/.cache/recalib_labelling` (override with `RECALIB_LABELLING_CACHE`). Its SHA-256 is checked against the file used to label ReCalib (`64184e22…0bc9ff`, model version 1, float16). The labels were produced with MediaPipe 0.10.21.
+The MediaPipe FaceLandmarker model (`face_landmarker.task`, Apache-2.0) is downloaded from Google on first use and cached in `~/.cache/recalib_reconstruction` (override with `RECALIB_RECONSTRUCTION_CACHE`). Its SHA-256 is checked against the file used to label ReCalib (`64184e22…0bc9ff`, model version 1, float16). The labels were produced with MediaPipe 0.10.21.
 
-Run the commands below from this folder (`labelling/`).
+Run the commands below from this folder (`3d_reconstruction/`).
 
 ## Usage
 
 **One image**
 
 ```bash
-python -m recalib_labelling.label_image path/to/image.png --setup ReCalib/setup.json --pog-px 915 10 --out label.json
+python -m recalib_reconstruction.label_image path/to/image.png --setup ReCalib/setup.json --pog-px 915 10 --out label.json
 ```
 
 Identifiers can be added with `--user-id`, `--session-id`, `--task-id`, `--sample-id` and `--task-type`. With the `--user-id` of a ReCalib user, that user's factor from `user_depth_scale.csv` is applied; `--depth-scale` sets a factor explicitly (1 = one-image method).
@@ -34,7 +34,7 @@ Identifiers can be added with `--user-id`, `--session-id`, `--task-id`, `--sampl
 **Many images**: a CSV with the columns `image`, `pog_px_x` and `pog_px_y`, plus the optional identifier columns. The release index has all of them, so the whole dataset can be relabelled:
 
 ```bash
-python -m recalib_labelling.label_batch --csv ReCalib/recalib_index.csv --images-root ReCalib --setup ReCalib/setup.json --out-dir relabelled --depth-scale user_depth_scale.csv
+python -m recalib_reconstruction.label_batch --csv ReCalib/recalib_index.csv --images-root ReCalib --setup ReCalib/setup.json --out-dir relabelled --depth-scale user_depth_scale.csv
 ```
 
 Without `--depth-scale` every image is labelled with the one-image method.
@@ -42,7 +42,7 @@ Without `--depth-scale` every image is labelled with the one-image method.
 **From Python**
 
 ```python
-from recalib_labelling import Labeller, label_image
+from recalib_reconstruction import Labeller, label_image
 
 doc = label_image("image.png", (915, 10), "ReCalib/setup.json")      # one image
 
@@ -53,7 +53,7 @@ with Labeller("ReCalib/setup.json") as labeller:                     # many imag
 **Check against the release**: relabels random released samples (with the factors of `user_depth_scale.csv`) and reports the differences per field.
 
 ```bash
-python -m recalib_labelling.verify_release --release-root ReCalib --n 200
+python -m recalib_reconstruction.verify_release --release-root ReCalib --n 200
 ```
 
 On 200 random samples the labels are reproduced exactly. Landmarks, head rotation, screen target and quality metrics are identical; gaze origin and head translation differ by at most 0.0002 mm, and gaze vectors by at most 0.0001° (rounding).
@@ -85,7 +85,7 @@ factor = median over the user's images of  (f × 11.7 mm / iris diameter in px) 
 The iris diameter is the mean of the four diameters of the two iris rings (landmarks 469–472 and 474–477), after lens undistortion. The factor multiplies the head translation and the gaze origin: a face s times larger at s times the distance gives the same image, so landmarks and rotation are unchanged. The gaze vector then points from the scaled origin to the same target.
 
 ```bash
-python -m recalib_labelling.face_scale --labels labels_one_image.csv --setup ReCalib/setup.json --out user_depth_scale.csv
+python -m recalib_reconstruction.face_scale --labels labels_one_image.csv --setup ReCalib/setup.json --out user_depth_scale.csv
 ```
 
 `--labels` takes labels made with the one-image method: a CSV in the `recalib_index.csv` format or a folder of JSON labels. The ReCalib factors (`user_depth_scale.csv`) were computed this way from the samples kept after quality filtering:

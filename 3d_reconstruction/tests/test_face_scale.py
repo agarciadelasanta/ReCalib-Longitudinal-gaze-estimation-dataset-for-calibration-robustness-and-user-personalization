@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from recalib_labelling.face_scale import (IRIS_DIAMETER_MM, RECALIB_FACTORS, iris_depth_mm, iris_diameter_px,
+from recalib_reconstruction.face_scale import (IRIS_DIAMETER_MM, RECALIB_FACTORS, iris_depth_mm, iris_diameter_px,
                                           load_factors, user_factors)
 
 K = np.array([[1475.0, 0, 960], [0, 1475.0, 540], [0, 0, 1.0]])

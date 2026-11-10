@@ -1,9 +1,9 @@
 """Label one image.
 
-    python -m recalib_labelling.label_image IMAGE --setup setup.json --pog-px X Y [--out label.json]
+    python -m recalib_reconstruction.label_image IMAGE --setup setup.json --pog-px X Y [--out label.json]
         [--user-id 00 --session-id 00 --task-id 01 --sample-id 0001 --task-type test] [--depth-scale F]
 
-With --user-id of a ReCalib user, the user's face scale from labelling/user_depth_scale.csv is used
+With --user-id of a ReCalib user, the user's face scale from 3d_reconstruction/user_depth_scale.csv is used
 unless --depth-scale is given (1 = canonical face, single-image labelling).
 
 Prints the JSON to stdout unless --out is given.

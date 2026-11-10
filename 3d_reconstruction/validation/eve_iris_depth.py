@@ -20,8 +20,8 @@ import h5py
 import mediapipe as mp
 import numpy as np
 
-from recalib_labelling.geometry import eye_midpoint_cam, head_pose_from_mediapipe
-from recalib_labelling.labeller import REQUIRED_LANDMARKS, Labeller
+from recalib_reconstruction.geometry import eye_midpoint_cam, head_pose_from_mediapipe
+from recalib_reconstruction.labeller import REQUIRED_LANDMARKS, Labeller
 
 IRIS_PAIRS = {"a1": (469, 471), "a2": (470, 472), "b1": (474, 476), "b2": (475, 477)}
 COLUMNS = (["recording", "frame", "fx", "gt_x", "gt_y", "gt_z", "ours_x", "ours_y", "ours_z",

@@ -1,7 +1,7 @@
 """Apply the per-user face scale to the released labels (gaze origin, gaze vector, head translation).
 
     python dataset_conversion/apply_depth_scale.py --release-root ReCalib \
-        --factors labelling/user_depth_scale.csv --canonical recalib_index_canonical_face.csv
+        --factors 3d_reconstruction/user_depth_scale.csv --canonical recalib_index_canonical_face.csv
 
 The first run copies recalib_index.csv (labels with MediaPipe's canonical face size) to --canonical,
 outside the release. Every run takes the canonical origin and translation from that copy, so running it
@@ -24,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labelling"))
-from recalib_labelling.face_scale import load_factors  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "3d_reconstruction"))
+from recalib_reconstruction.face_scale import load_factors  # noqa: E402
 
 
 def r(values, digits):

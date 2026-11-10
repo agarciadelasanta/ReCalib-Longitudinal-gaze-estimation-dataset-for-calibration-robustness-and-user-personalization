@@ -1,6 +1,6 @@
 """Compare the ETH-XGaze eye centre with the EVE ground truth, on the frames of eve_compare.py.
 
-    python labelling/validation/eve_eth_compare.py --compare H:/EVE/relabel_eval/eve_compare_all.csv \
+    python 3d_reconstruction/validation/eve_eth_compare.py --compare H:/EVE/relabel_eval/eve_compare_all.csv \
         --frames-root H:/EVE/Mamu_untagged --h5-root H:/EVE/Extracted_webcam_h5 \
         --out H:/EVE/relabel_eval/eve_eth_compare_all.csv [--workers 12]
 

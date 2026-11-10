@@ -11,10 +11,10 @@ computed on labels made with factor 1. Labelling with Labeller.label(..., depth_
 places the head and gaze origin at the corrected depth (a face s times larger at s times the
 distance projects identically, so landmarks and rotation are unchanged).
 
-    python -m recalib_labelling.face_scale --labels labels.csv --setup setup.json --out user_depth_scale.csv
+    python -m recalib_reconstruction.face_scale --labels labels.csv --setup setup.json --out user_depth_scale.csv
 
 --labels is a CSV in the recalib_index.csv format, or a folder of JSON labels, made with factor 1.
-The factors used for ReCalib are in labelling/user_depth_scale.csv.
+The factors used for ReCalib are in 3d_reconstruction/user_depth_scale.csv.
 """
 import argparse
 import csv
