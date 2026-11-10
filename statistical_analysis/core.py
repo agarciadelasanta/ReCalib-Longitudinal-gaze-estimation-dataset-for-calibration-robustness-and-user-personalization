@@ -87,6 +87,10 @@ ETH_FEATURE_NOTES = {
 }
 ETH_UNAVAILABLE_FAMILIES = ("head_rotation", "head_translation")
 ETH_FILTER_COLUMN = "eth_ok"
+# as the released gaze_eth_xgaze (dataset_conversion/add_eth_xgaze_origin.py): a face centre farther
+# than this from the camera is a false dlib detection and has no ETH-XGaze label in the release
+ETH_DEPTH_COLUMN = "eth_face_center_z"
+ETH_MAX_DEPTH_MM = 900.0
 # task_type names of the calibration and test tasks: released summaries use
 # "calibration"/"test", older ones "9-point"/"16-point".
 CALIBRATION_TASK_TYPES = ("calibration", "9-point")
@@ -193,7 +197,7 @@ def _prepare_accepted_frame(
     if require_task_type:
         required.add("task_type")
     if label_set == "eth":
-        required.add(ETH_FILTER_COLUMN)
+        required.update({ETH_FILTER_COLUMN, ETH_DEPTH_COLUMN})
     if "target_conditioned" in config.views or "target_coverage" in config.feature_families:
         required.update({"pog_px_x", "pog_px_y"})
     for family in config.feature_families:
@@ -295,12 +299,19 @@ def _not_discarded(values: pd.Series) -> pd.Series:
     return ~normalized.isin({"true", "1", "yes"})
 
 
+def eth_usable(frame: pd.DataFrame) -> pd.Series:
+    """Rows with an ETH-XGaze label: processed by the baseline, face centre within ETH_MAX_DEPTH_MM."""
+
+    ok = pd.to_numeric(frame[ETH_FILTER_COLUMN], errors="coerce").eq(1)
+    return ok & pd.to_numeric(frame[ETH_DEPTH_COLUMN], errors="coerce").le(ETH_MAX_DEPTH_MM)
+
+
 def _accepted_mask(frame: pd.DataFrame, label_set: str = "recalib") -> pd.Series:
-    """Non-discarded rows; with ETH labels, only those the baseline processed (eth_ok == 1)."""
+    """Non-discarded rows; with ETH labels, only those that have one (see eth_usable)."""
 
     mask = _not_discarded(frame["discarded"])
     if label_set == "eth":
-        mask &= pd.to_numeric(frame[ETH_FILTER_COLUMN], errors="coerce").eq(1)
+        mask &= eth_usable(frame)
     return mask
 
 
@@ -324,7 +335,7 @@ def _column_catalog(
     filters = {"discarded"}
     if config.label_set == "eth":
         structural.add(ETH_FILTER_COLUMN)
-        filters.add(ETH_FILTER_COLUMN)
+        filters.update({ETH_FILTER_COLUMN, ETH_DEPTH_COLUMN})
     source_to_families: dict[str, list[str]] = {}
     for family in config.feature_families:
         for column in feature_sources(family, config.label_set):

@@ -31,7 +31,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 
 from .progress import progress, stage
-from .core import ETH_FILTER_COLUMN, _not_discarded
+from .core import ETH_DEPTH_COLUMN, ETH_FILTER_COLUMN, _not_discarded, eth_usable
 from .reporting import AnalysisManifest
 
 
@@ -122,7 +122,7 @@ def _prepare_frame(
     for vector in config.vectors:
         required.update(VECTOR_SOURCES[vector])
     if uses_eth:
-        required.add(ETH_FILTER_COLUMN)
+        required.update({ETH_FILTER_COLUMN, ETH_DEPTH_COLUMN})
     missing = sorted(required.difference(frame.columns))
     if missing:
         raise ValueError(f"Missing required columns: {', '.join(missing)}")
@@ -130,7 +130,7 @@ def _prepare_frame(
     not_discarded = _not_discarded(frame["discarded"])
     mask = not_discarded.copy()
     if uses_eth:
-        mask &= pd.to_numeric(frame[ETH_FILTER_COLUMN], errors="coerce").eq(1)
+        mask &= eth_usable(frame)
     accepted = frame.loc[mask].copy()
     for column in ("user_id", "session_id", "task_type"):
         accepted[column] = accepted[column].astype("string")

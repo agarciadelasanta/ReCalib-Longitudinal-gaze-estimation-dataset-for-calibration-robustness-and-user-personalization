@@ -38,7 +38,7 @@ def _frame(*, eth_follows_head=True, seed=0):
                     eth = np.array([target_pitch, target_yaw]) + variation + [2.0, 0.5]
                     row = {
                         "user_id": user, "session_id": session, "task_type": "test",
-                        "discarded": False, "eth_ok": 1.0,
+                        "discarded": False, "eth_ok": 1.0, "eth_face_center_z": 600.0,
                         "pog_px_x": float(index % 2), "pog_px_y": float(index // 2),
                     }
                     row.update(zip(("gaze_vector_x", "gaze_vector_y", "gaze_vector_z"), _vector(*recalib)))
@@ -91,6 +91,7 @@ class GazeConsistencyTests(unittest.TestCase):
         frame = _frame()
         frame.loc[0, "discarded"] = True
         frame.loc[1, "eth_ok"] = 0.0
+        frame.loc[2, "eth_face_center_z"] = 2500.0  # false dlib detection, null in the release
         extra = frame.iloc[[5, 6]].assign(session_id="09")
         frame = pd.concat([frame, extra], ignore_index=True)
 
@@ -99,9 +100,9 @@ class GazeConsistencyTests(unittest.TestCase):
         )
 
         self.assertEqual(result.metadata["discarded_rows_excluded"], 1)
-        self.assertEqual(result.metadata["eth_unavailable_rows_excluded"], 1)
+        self.assertEqual(result.metadata["eth_unavailable_rows_excluded"], 2)
         self.assertEqual(result.metadata["small_sessions_excluded"], 1)
-        self.assertEqual(result.metadata["accepted_rows"], len(frame) - 4)
+        self.assertEqual(result.metadata["accepted_rows"], len(frame) - 5)
         self.assertNotIn("09", set(result.offsets["session_id"]))
 
     def test_missing_columns_and_bad_config_are_rejected(self):

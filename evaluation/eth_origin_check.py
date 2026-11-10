@@ -85,12 +85,15 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--face-model", type=Path, default=EVAL_DIR / "face_model.txt")
-    ap.add_argument("--shape-predictor", type=Path, default=EVAL_DIR / "modules" / "shape_predictor_68_face_landmarks.dat")
+    ap.add_argument("--shape-predictor", type=Path, help="local dlib 68-point model (default: downloaded from dlib.net on first use and cached in ~/.cache/recalib_evaluation)")
     ap.add_argument("--camera-npz", type=Path, default=EVAL_DIR.parent / "docs" / "camera_intrinsics.npz")
     args = ap.parse_args()
+    codes = args.discard_codes.split(",")
+    if "2" in codes:
+        ap.error("discard code 2 frames have no gaze labels (MediaPipe found no usable face), so they cannot be used")
 
     with open(args.release_root / "recalib_index.csv", newline="", encoding="utf-8") as fh:
-        index = [r for r in csv.DictReader(fh) if r["discard_code"] in args.discard_codes.split(",")]
+        index = [r for r in csv.DictReader(fh) if r["discard_code"] in codes]
     random.Random(args.seed).shuffle(index)
     rows = index[: args.n] if args.n else index
 
@@ -103,11 +106,12 @@ def main():
         rows = [r for r in rows if r["image"] not in done]
         print(f"resuming: {len(results)} frames already in {args.out}, {len(rows)} to do", flush=True)
 
+    shape_predictor = ensure_shape_predictor(args.shape_predictor)  # downloaded once, before the workers start
     columns = ["image", "user", "session", "task", "discard_code", "ok"] + [f"{p}_{a}" for p in ("ours", "eth_eye", "eth_face_center") for a in "xyz"]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     start = time.time()
     with open(args.out, "w", newline="", encoding="utf-8") as fh, \
-            Pool(args.workers, _init, (args.face_model, args.shape_predictor, args.camera_npz)) as pool:
+            Pool(args.workers, _init, (args.face_model, shape_predictor, args.camera_npz)) as pool:
         w = csv.DictWriter(fh, columns, restval="", extrasaction="ignore")
         w.writeheader()
         w.writerows(results)

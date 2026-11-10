@@ -17,7 +17,7 @@ OUTPUT_H5 = ROOT_DIR / 'temp' / 'full_dataset.h5'
 
 # Make sure these paths point to your actual local files
 CAMERA_NPZ = str(ROOT_DIR / 'docs' / 'camera_intrinsics.npz')
-SHAPE_PREDICTOR = str(SCRIPT_DIR / 'modules' / 'shape_predictor_68_face_landmarks.dat')
+SHAPE_PREDICTOR = None  # None: cached model, downloaded from dlib.net on first use (dlib_model.py)
 FACE_MODEL = str(SCRIPT_DIR / 'face_model.txt')
 # ---------------------
 

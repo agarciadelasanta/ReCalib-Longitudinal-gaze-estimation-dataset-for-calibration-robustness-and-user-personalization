@@ -22,7 +22,7 @@ Test sets are always the 16-point test tasks of the held-out session. Everything
 
 ## Steps
 
-Requirements: `pip install -r requirements.txt`, plus `evaluation/ckpt/epoch_24_ckpt.pth.tar`. The dlib 68-point shape predictor is downloaded from dlib.net into `evaluation/modules/` on first use (see `evaluation/README.md`). Run from the repo root.
+Requirements: `pip install -r requirements.txt`, plus `evaluation/ckpt/epoch_24_ckpt.pth.tar`. The dlib 68-point shape predictor is downloaded from dlib.net on first use and cached outside the repository (see `evaluation/README.md`). Run from the repo root.
 
 **1. Normalize the release once** (CPU, dlib on the full 1920×1080 image; about 2 s per frame per worker on a laptop CPU):
 
@@ -38,10 +38,10 @@ python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/folds
 
 Options: `--scenarios zeroshot,calib,personal,personal_calib,louo,louo_calib` adds the leave-one-user-out control, `--curve 1,2,4,8` adds the learning curve (`personal_prev<k>`: the k sessions recorded just before), and `--personal-order chronological` trains on earlier sessions only.
 
-**3. (Optional) check the fine-tuning settings before scoring any test task.** `protocol_config.json` uses the official ETH-XGaze defaults. To check, for example, the number of epochs without touching test data, write a tuning manifest with validation sessions held out of training, train without testing, and read `val_err_deg` per epoch in each `log.json`:
+**3. (Optional) check the fine-tuning settings before scoring any test task.** `protocol_config.json` uses the official ETH-XGaze defaults. To check, for example, the number of epochs without touching test data, write a tuning manifest that leaves out the held-out sessions of the real manifest (step 2), with validation sessions held out of training, train without testing, and read `val_err_deg` per epoch in each `log.json`:
 
 ```bash
-python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/tune.json --test-sessions 9 --val-sessions 2 --scenarios personal
+python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/tune.json --test-sessions 9 --val-sessions 2 --scenarios personal --exclude-test-sessions-of runs/folds.json
 python evaluation/run_protocol_fold.py --manifest runs/tune.json --out-dir runs/tune --scenario personal --no-test
 ```
 
@@ -69,7 +69,11 @@ This writes `scenarios.csv`, `users.csv`, `contrasts.csv` (paired gains, % of se
 
 ## Cross-session check
 
-Calibrates the model on one session (the `calib` fold of that session, same training) and scores it on the test tasks of every session of the same user. This gives one row of the user's session × session error matrix.
+Calibrates the model on one session (the `calib` fold of that session, same training) and scores it on the test tasks of every session of the same user. This gives one row of the user's session × session error matrix. It needs a manifest with every session held out (step 2 without `--test-sessions`):
+
+```bash
+python evaluation/make_protocol_folds.py --h5 /data/protocol.h5 --out runs/folds_all.json --scenarios calib
+```
 
 ```bash
 python evaluation/cross_session_eval.py --manifest runs/folds_all.json --out-dir runs/cross --list
@@ -85,6 +89,6 @@ Run one `--index` per process; a session whose `pairs/u<user>_s<session>.csv` ex
 |---|---|---|
 | `calib`, `personal_calib`, `louo_calib` | about 126 (the calibration task) | 1 per held-out session |
 | `personal` | about 16,000 (the user's other ~20 sessions) | 1 per held-out session |
-| `louo` | about 135,000 (8 users) | 1 per user |
+| `louo` | about 118,000 (7 users; an eighth is held out for validation) | 1 per user |
 
 `personal` dominates: 20 held-out sessions × 16k frames × 25 epochs ≈ 8 M training images. The number of epochs is the main cost lever.

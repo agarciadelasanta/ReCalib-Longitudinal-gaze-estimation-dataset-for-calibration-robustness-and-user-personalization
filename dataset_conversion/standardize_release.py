@@ -20,8 +20,9 @@ Rules
     samples   sample id = position of the frame in its task (4 digits, from 0001), in acquisition order
     discards  every sample is released; discarded ones carry discard_info.
 
-Dry run by default (nothing is moved); add --execute to write the release. Execution is
-resumable: samples already moved are skipped.
+Dry run by default (nothing is moved); add --execute to write the release. Execution is not
+resumable (sample numbers come from the frames still in RAW/DISCARDED): it stops if the output
+already holds any of the planned samples.
 """
 import argparse
 import csv
@@ -283,12 +284,14 @@ def main():
         print("dry run: nothing moved. Re-run with --execute to write the release.")
         return 0
 
-    moved = skipped = 0
+    existing = [s["out_png"] for s in samples if (args.out / s["out_png"]).exists()]
+    if existing:
+        print(f"{len(existing)} planned samples already exist in {args.out} (e.g. {existing[0]}); "
+              "nothing moved. Restore RAW/DISCARDED and start from an empty output folder.")
+        return 1
+    moved = 0
     for s, d in zip(samples, docs):
         out_png, out_json = args.out / s["out_png"], args.out / s["out_json"]
-        if out_png.exists() and not s["raw_png"].exists():
-            skipped += 1
-            continue
         out_png.parent.mkdir(parents=True, exist_ok=True)
         with open(out_json, "w", encoding="utf-8") as fh:
             json.dump(d, fh, indent=4)
@@ -300,7 +303,7 @@ def main():
         json.dump(setup_json, fh, indent=4)
     write_csv(args.out / "sessions.csv", sessions_rows)
     write_csv(args.out / "recalib_index.csv", index_rows)
-    print(f"release written to {args.out}: {moved} samples moved, {skipped} already done")
+    print(f"release written to {args.out}: {moved} samples moved")
     return 0
 
 

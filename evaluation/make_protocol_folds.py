@@ -22,8 +22,10 @@ Choices recorded in the manifest (identical for all folds):
   --personal-order loso (default; all other sessions) or chronological (earlier sessions only)
   --test-sessions  N held-out sessions in total instead of all of them (spread evenly over the users
                    and, within a user, over the recording period); every session-level scenario uses
-                   the same held-out sessions, so they can be compared pairwise. Training sets still
-                   use all other sessions.
+                   the same held-out sessions (zero-shot included), so they can be compared pairwise.
+                   Training sets still use all other sessions.
+  --exclude-test-sessions-of  manifest whose held-out sessions are left out of every set (training,
+                   validation and test), e.g. to tune the settings without touching the real test sessions
 """
 import argparse
 import json
@@ -53,6 +55,8 @@ def main():
     ap.add_argument("--val-users", type=int, default=1,
                     help="louo: hold out this many training users as validation for early stopping (test tasks)")
     ap.add_argument("--test-sessions", type=int, help="held-out sessions in total (default: all)")
+    ap.add_argument("--exclude-test-sessions-of", type=Path, metavar="MANIFEST",
+                    help="leave the held-out sessions of this manifest out of every set (for a tuning manifest)")
     ap.add_argument("--curve", default="", help="learning curve, e.g. 1,2,4,8 -> scenarios personal_prev<k>")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -62,6 +66,10 @@ def main():
     valid = meta["valid"]
     users = sorted(set(meta["user"][valid]))
     sessions = {u: sorted(set(meta["session"][valid & (meta["user"] == u)])) for u in users}
+    excluded = {}
+    if args.exclude_test_sessions_of:
+        excluded = json.loads(args.exclude_test_sessions_of.read_text(encoding="utf-8"))["test_sessions"]
+        sessions = {u: [s for s in v if s not in excluded.get(u, [])] for u, v in sessions.items()}
     held_out = {u: list(v) for u, v in sessions.items()}
     if args.test_sessions:
         # spread N over the users (the remainder goes to the users with most sessions), then pick
@@ -78,6 +86,12 @@ def main():
     def clause(us, ss, tasks):
         return {"users": list(us), "sessions": None if ss is None else list(ss), "tasks": tasks}
 
+    def all_sessions(us, tasks):
+        # every session of these users; listed per user when some sessions are excluded
+        if excluded:
+            return [clause([x], sessions[x], tasks) for x in us]
+        return [clause(us, None, tasks)]
+
     def personal_sets(u, s):
         others = [x for x in sessions[u] if x != s]
         if args.personal_order == "chronological":
@@ -89,21 +103,21 @@ def main():
             others = [x for x in others if x not in val]
         train = [clause([u], others, "all")] if others else []
         if args.personal_pool == "all":
-            train.append(clause([x for x in users if x != u], None, "all"))
+            train += all_sessions([x for x in users if x != u], "all")
         return train, [clause([u], val, "test")] if val else []
 
     folds = []
     for sc in scenarios:
         if sc == "zeroshot":
             folds.append(dict(id="zeroshot/all", scenario=sc, init="eth", train=[], val=[],
-                              test=[clause(users, None, "test")]))
+                              test=[clause([u], held_out[u], "test") for u in users]))
         elif sc == "louo":
             for u in users:
                 others = [x for x in users if x != u]
                 val = sorted(rng.choice(others, args.val_users, replace=False).tolist()) if args.val_users else []
                 folds.append(dict(id=f"louo/u{u}", scenario=sc, init="eth",
-                                  train=[clause([x for x in others if x not in val], None, "all")],
-                                  val=[clause(val, None, "test")] if val else [],
+                                  train=all_sessions([x for x in others if x not in val], "all"),
+                                  val=all_sessions(val, "test") if val else [],
                                   test=[clause([u], held_out[u], "test")]))
         else:
             for u in users:
@@ -141,9 +155,14 @@ def main():
             skipped.append(f["id"])
         else:
             kept.append(f)
+    # a fold that starts from a skipped fold is skipped too (e.g. personal_calib of a user's first
+    # session with --personal-order chronological, whose personal fold has no training data)
     ids = {f["id"] for f in kept}
-    for f in kept:
-        if f["init"] != "eth" and f["init"] not in ids:
+    for f in [f for f in kept if f["init"] != "eth" and f["init"] not in ids]:
+        if f["init"].split("/")[0] in scenarios:
+            skipped.append(f["id"])
+            kept.remove(f)
+        else:
             raise SystemExit(f"{f['id']} starts from {f['init']}, which is not in the manifest")
     inits = {f["init"] for f in kept}
     for f in kept:
@@ -153,11 +172,12 @@ def main():
                     personal_pool=args.personal_pool, personal_order=args.personal_order,
                     val_sessions=args.val_sessions, val_users=args.val_users, seed=args.seed,
                     test_sessions={u: v for u, v in held_out.items()},
+                    excluded_sessions=excluded,
                     scenarios=scenarios, n_users=len(users), n_sessions=sum(map(len, sessions.values())),
                     skipped=skipped, folds=kept)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    print(f"{len(kept)} folds written to {args.out} ({len(skipped)} skipped: no training or test data)")
+    print(f"{len(kept)} folds written to {args.out} ({len(skipped)} skipped: no training or test data, or no start model)")
     for sc in scenarios:
         fs = [f for f in kept if f["scenario"] == sc]
         if fs:

@@ -14,10 +14,12 @@ Scripts that turned the labelled acquisition output into the released dataset, p
 
 ## Reproducing the annotations from the released images
 
+With the dataset unpacked in `ReCalib/` at the repository root:
+
 ```bash
 cd labelling
-python -m recalib_labelling.label_batch --csv ReCalib/recalib_index.csv --images-root ReCalib \
-    --setup ReCalib/setup.json --out-dir relabelled --depth-scale user_depth_scale.csv
+python -m recalib_labelling.label_batch --csv ../ReCalib/recalib_index.csv --images-root ../ReCalib \
+    --setup ../ReCalib/setup.json --out-dir relabelled --depth-scale user_depth_scale.csv
 cd ..
 python dataset_conversion/apply_quality_flags.py --labels labelling/relabelled --setup ReCalib/setup.json \
     --write --compare-index ReCalib/recalib_index.csv

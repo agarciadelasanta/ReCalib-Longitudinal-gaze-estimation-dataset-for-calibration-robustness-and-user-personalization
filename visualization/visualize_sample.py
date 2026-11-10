@@ -15,9 +15,6 @@ from utils import checkIfisAValidPNGPair
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEST_IMAGE = REPO_ROOT / "example" / "07_00_02_img-0039.png"
 DEFAULT_SETUP_CONFIG = REPO_ROOT / "docs" / "setup.json"
-DEFAULT_SHAPE_PREDICTOR = (
-    REPO_ROOT / "evaluation" / "modules" / "shape_predictor_68_face_landmarks.dat"
-)
 DEFAULT_FACE_MODEL = Path(__file__).resolve().parent / "face_model.txt"
 
 
@@ -46,8 +43,9 @@ def build_parser():
     parser.add_argument(
         "--shape-predictor",
         type=Path,
-        default=DEFAULT_SHAPE_PREDICTOR,
-        help="dlib 68-landmark model used with --checkpoint (image-only landmarks).",
+        default=None,
+        help="Local dlib 68-landmark model used with --checkpoint (default: downloaded from dlib.net "
+        "on first use and cached in ~/.cache/recalib_evaluation).",
     )
     parser.add_argument(
         "--face-model",
@@ -88,7 +86,8 @@ def existing_path(parser, path, label):
 
 def create_estimator(args, parser):
     checkpoint = existing_path(parser, args.checkpoint, "checkpoint")
-    shape_predictor = existing_path(parser, args.shape_predictor, "shape predictor")
+    shape_predictor = (existing_path(parser, args.shape_predictor, "shape predictor")
+                       if args.shape_predictor is not None else None)
     face_model = existing_path(parser, args.face_model, "face model")
     camera_intrinsics = None
     if args.camera_intrinsics is not None:
@@ -107,7 +106,7 @@ def create_estimator(args, parser):
         )
 
     return ETHXGazeEstimator(
-        shape_predictor_path=str(shape_predictor),
+        shape_predictor_path=str(shape_predictor) if shape_predictor else None,
         face_model_path=str(face_model),
         ckpt_path=str(checkpoint),
         camera_npz_path=str(camera_intrinsics) if camera_intrinsics else None,

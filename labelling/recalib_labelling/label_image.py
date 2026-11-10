@@ -28,6 +28,8 @@ def main(argv=None) -> int:
         ap.add_argument(f"--{key}")
     ap.add_argument("--depth-scale", type=float, help="per-user face scale (default: ReCalib factor of --user-id, else 1)")
     args = ap.parse_args(argv)
+    if args.user_id is not None and args.user_id.isdigit():
+        args.user_id = args.user_id.zfill(2)  # ReCalib user ids are "00".."08"
 
     ids = {k: getattr(args, k) for k in ("user_id", "session_id", "task_id", "sample_id", "task_type")
            if getattr(args, k) is not None}

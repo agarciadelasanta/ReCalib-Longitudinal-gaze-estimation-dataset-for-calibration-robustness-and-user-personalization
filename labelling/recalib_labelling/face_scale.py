@@ -116,6 +116,9 @@ def main(argv=None) -> int:
     cam = load_setup(args.setup)["camera"]
     records = _records_from_jsons(args.labels) if args.labels.is_dir() else _records_from_index(args.labels)
     factors = user_factors(records, cam["camera_matrix"], cam["dist_coeffs_k1_k2_p1_p2_k3"])
+    if factors and all(abs(f - 1) < 0.002 for f, _, _ in factors.values()):
+        print("warning: every factor is 1. The labels already include a face scale (e.g. the released "
+              "recalib_index.csv); --labels needs labels made with the one-image method (factor 1)")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)

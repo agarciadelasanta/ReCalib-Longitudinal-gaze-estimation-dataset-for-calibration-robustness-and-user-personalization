@@ -76,9 +76,10 @@ def main():
                 continue
             if doc.get("gaze"):
                 origin_d.append(float(np.linalg.norm(np.subtract(doc["gaze"]["origin_mm"], new["gaze"]["origin_mm"]))))
-            if doc["head_pose"]["mediapipe_face_mesh_2d"] != new["head_pose"]["mediapipe_face_mesh_2d"]:
+            if (doc.get("head_pose") or {}).get("mediapipe_face_mesh_2d") != new["head_pose"]["mediapipe_face_mesh_2d"]:
                 changed_lm += 1
-            ear_old.append(None if doc["quality_assurance_metrics"] is None else doc["quality_assurance_metrics"]["eye_aspect_ratio"]["mean"])
+            qa_old = doc.get("quality_assurance_metrics")
+            ear_old.append(None if qa_old is None else qa_old["eye_aspect_ratio"]["mean"])
             ear_new.append(new["quality_assurance_metrics"]["eye_aspect_ratio"]["mean"])
             if args.write:
                 dest = args.backup / row["image"]
@@ -88,6 +89,8 @@ def main():
                     doc[k] = new[k]
                 with open(path, "w", encoding="utf-8") as fh:      # CRLF and indent 4, as the release
                     json.dump(doc, fh, indent=4)
+                # landmarks outside the image are omitted from the labels: clear the old ones first
+                row.update({k: "" for k in fields if k.startswith("lm_")})
                 row.update(index_values(doc))
 
     if args.write:
@@ -101,10 +104,11 @@ def main():
     print(f"landmarks changed in {changed_lm}")
     if origin_d:
         print(f"gaze origin change: median {np.median(origin_d):.4f} mm, max {max(origin_d):.4f} mm")
-    had = [(o, e) for o, e in zip(ear_old, ear_new) if o is not None]
-    print(f"QA block missing before: {sum(o is None for o in ear_old)}; mean EAR now {min(ear_new):.4f}-{max(ear_new):.4f}, "
-          f"below 0.05: {sum(e < 0.05 for e in ear_new)}/{len(ear_new)}; stored EAR before (where present) "
-          f"{min(o for o, _ in had):.4f}-{max(o for o, _ in had):.4f}")
+    had = [o for o in ear_old if o is not None]
+    if ear_new:
+        print(f"QA block missing before: {len(ear_old) - len(had)}; mean EAR now {min(ear_new):.4f}-{max(ear_new):.4f}, "
+              f"below 0.05: {sum(e < 0.05 for e in ear_new)}/{len(ear_new)}"
+              + (f"; stored EAR before (where present) {min(had):.4f}-{max(had):.4f}" if had else ""))
     print("written (originals in %s)" % args.backup if args.write else "dry run, nothing written")
 
 
