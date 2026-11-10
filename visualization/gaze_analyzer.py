@@ -34,7 +34,9 @@ def load_gaze_analysis_params(params_path: str) -> dict:
 # ------------------ GEOMETRY FUNCTIONS ----------------------
 # ============================================================
 
-def intersect_gaze(gaze, P0=np.array([0.0, 0.0, 40.0])):
+def intersect_gaze(gaze, P0=np.array([0.0, 0.0, 400.0])):
+    # Point where the ray from P0 along gaze meets the camera plane z = 0 (mm). The default P0 is a
+    # fixed eye 400 mm in front of the camera, which removes head position ("normalized" PoG).
     V0 = np.array([0, 0, 0], dtype=float)
     n = np.array([0, 0, 1], dtype=float)
     gaze = np.asarray(gaze, dtype=float).flatten()
@@ -158,7 +160,7 @@ def plot_vs_coverage_smooth(df: pd.DataFrame, x_var: str, y_var: str, x_lim=None
         train_data = df[df['task_type'] == 'calibration']
         if not train_data.empty: 
             sns.kdeplot(data=train_data, x=x_var, y=y_var, fill=True, color='blue', alpha=0.6, ax=ax, thresh=0.05)
-        ax.legend(handles=[Patch(facecolor='orange', alpha=0.4, label='16-point'), Patch(facecolor='blue', alpha=0.6, label='9-point')], loc='upper right', fontsize=30)
+        ax.legend(handles=[Patch(facecolor='orange', alpha=0.4, label='Test'), Patch(facecolor='blue', alpha=0.6, label='Calibration')], loc='upper right', fontsize=30)
         
     # 2. Split by Session (SMALL MULTIPLES GRID FIX)
     elif split_plot_type == "task":
@@ -199,10 +201,13 @@ def plot_vs_coverage_smooth(df: pd.DataFrame, x_var: str, y_var: str, x_lim=None
             sns.kdeplot(data=calib_data, x=x_var, y=y_var, hue='id_session', fill=True, alpha=0.4, ax=ax, thresh=0.05, palette='tab10', common_norm=False, legend=False)
 
     # Formatting (for single axis plots only)
+    ax.set_title(title, fontsize=32)
     ax.set_xlabel(x_var, fontsize=32)
     ax.set_ylabel(y_var, fontsize=32)
     ax.tick_params(axis='both', which='major', labelsize=23)
     ax.grid(True, linestyle='--', alpha=0.3)
+    if x_lim: ax.set_xlim(x_lim[0], x_lim[1])
+    if y_lim: ax.set_ylim(y_lim[0], y_lim[1])
     fig.tight_layout()
 
 def plot_hpe_histograms(df: pd.DataFrame, xlims_by_suffix=None, id_user=None):
@@ -231,7 +236,7 @@ def save_all_figures(export_dir: str):
         title = fig._suptitle.get_text() if fig._suptitle else (fig.get_axes()[0].get_title() if fig.get_axes() else f"figure_{i}")
         clean_title = re.sub(r'[-\s]+', '_', re.sub(r'[^\w\s-]', '', str(title)).strip().lower())
         filepath = os.path.join(export_dir, f"{clean_title}.png")
-        fig.savefig(filepath, dpi=150)
+        fig.savefig(filepath, dpi=150, bbox_inches="tight")
 
 def _pandas_manipulation(df_local):
     """
@@ -250,7 +255,14 @@ def _pandas_manipulation(df_local):
         'head_trans_x': 'hpe_t_x',
         'head_trans_y': 'hpe_t_y',
         'head_trans_z': 'hpe_t_z',
-        
+        # column names of the released recalib_index.csv
+        'head_rotation_rad_x': 'hpe_r_x',
+        'head_rotation_rad_y': 'hpe_r_y',
+        'head_rotation_rad_z': 'hpe_r_z',
+        'head_translation_mm_x': 'hpe_t_x',
+        'head_translation_mm_y': 'hpe_t_y',
+        'head_translation_mm_z': 'hpe_t_z',
+
         # Traducir los nuevos nombres de Origen y Punto de mirada (POG)
         'gaze_origin_x': 'gaze_origin_mm_x',
         'gaze_origin_y': 'gaze_origin_mm_y',
@@ -313,7 +325,9 @@ def analyze(args):
     df = _pandas_manipulation(df)
     
     # 2. DISCARD FLAGGED SAMPLES
-    if 'discard_info' in df.columns:
+    if 'discarded' in df.columns:
+        df = df[~df['discarded'].astype(str).str.strip().str.lower().isin(['true', '1'])]
+    elif 'discard_info' in df.columns:
         df = df[df['discard_info'] == 'NO_DISCARDED']
         
     print(f"After sample discard CSV: {len(df)} rows, {len(df.columns)} columns")
@@ -389,7 +403,7 @@ def analyze(args):
             plot_vs_coverage_smooth(df, "hpe_r_x", "hpe_r_y", x_lim=x_axis_hpe_r_lim, y_lim=y_axis_hpe_r_lim, split_plot_type="task_type", title="Overall Coverage - HPE_r X vs Y")
             plot_vs_coverage_smooth(df, "hpe_r_x", "hpe_r_z", x_lim=x_axis_hpe_r_lim, y_lim=z_axis_hpe_r_lim, split_plot_type="task_type", title="Overall Coverage - HPE_r X vs Z")
             plot_vs_coverage_smooth(df, "gaze_vector_x", "gaze_vector_y", x_lim=x_axis_ge_lim, y_lim=y_axis_ge_lim, split_plot_type="task_type", title="Overall Coverage - Gaze Vector X vs Y")
-            plot_vs_coverage_smooth(df, "pog_norm_x", "pog_norm_y", x_lim=x_axis_ge_lim, y_lim=y_axis_ge_lim, split_plot_type="task_type", title="Overall Coverage - POG Normalized X vs Y")
+            plot_vs_coverage_smooth(df, "pog_norm_x", "pog_norm_y", x_lim=x_axis_pog_norm_lim, y_lim=y_axis_pog_norm_lim, split_plot_type="task_type", title="Overall Coverage - POG Normalized X vs Y")
 
     if args.export_dir:
         os.makedirs(args.export_dir, exist_ok=True)

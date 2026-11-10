@@ -1,6 +1,6 @@
 # Statistical analysis
 
-Model-independent comparisons of the released labels. Both tools read a summary CSV written by `dataset_conversion/create_dataset_summary.py` and use the kept samples only.
+Model-independent comparisons of the released labels, on the kept samples only. The hierarchical comparison reads a summary CSV written by `dataset_conversion/create_dataset_summary.py`; `within_session_tasks.py` reads the release index (`recalib_index.csv`). With `--labels eth`, and in `python -m statistical_analysis consistency` (agreement between the released and the ETH-XGaze gaze vectors), the summary must include the ETH-XGaze columns (`create_dataset_summary.py --eth-csv`); frames whose ETH-XGaze face centre is more than 900 mm from the camera are left out, as in the released `gaze_eth_xgaze`.
 
 ## Hierarchical comparison of participants and sessions
 

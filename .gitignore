@@ -18,6 +18,6 @@ logs/
 .agents/
 logs/
 recalib_agent_context/
-!labelling/user_depth_scale.csv
+!3d_reconstruction/user_depth_scale.csv
 scripts/
 docs/private/

@@ -10,7 +10,7 @@ the bounding box of the eye's six contour landmarks, resized to 20 x 10 px and s
 eyes are classified closed.
 
 The eyes are located with MediaPipe FaceLandmarker, the model and settings used for the labels
-(labelling/recalib_labelling), instead of dlib: the six contour landmarks of each eye are the ones of
+(3d_reconstruction/recalib_reconstruction), instead of dlib: the six contour landmarks of each eye are the ones of
 the eye aspect ratio (subject's right eye 33, 160, 158, 133, 153, 144; left eye 362, 385, 387, 263,
 373, 380), the MediaPipe counterparts of dlib's eye landmarks 36-41 and 42-47. As in BegiBox, the image
 is first rotated about the eye centre so that the eye corners 33 and 263 are level.
@@ -33,8 +33,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labelling"))
-from recalib_labelling.model import ensure_model  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "3d_reconstruction"))
+from recalib_reconstruction.model import ensure_model  # noqa: E402
 
 MODEL_MD5 = "269704d9773e5165b230cfe84232817c"
 RIGHT_EYE = (33, 160, 158, 133, 153, 144)     # subject's right eye (left in the image)
@@ -53,7 +53,7 @@ def _init(cnn_path, landmarker_path):
     tf.config.threading.set_intra_op_parallelism_threads(1)
     tf.config.threading.set_inter_op_parallelism_threads(1)
     cv2.setNumThreads(1)
-    options = mp.tasks.vision.FaceLandmarkerOptions(        # as labelling/recalib_labelling/labeller.py
+    options = mp.tasks.vision.FaceLandmarkerOptions(        # as 3d_reconstruction/recalib_reconstruction/labeller.py
         base_options=mp.tasks.BaseOptions(model_asset_path=str(landmarker_path), delegate=mp.tasks.BaseOptions.Delegate.CPU),
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1, min_face_detection_confidence=0.5, min_face_presence_confidence=0.5,

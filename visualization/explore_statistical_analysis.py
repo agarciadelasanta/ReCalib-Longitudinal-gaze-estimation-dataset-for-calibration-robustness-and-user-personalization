@@ -548,11 +548,11 @@ function renderMatrix(rows) {
   Plotly.react("matrix-chart", [{
     type: "heatmap", x: users, y: users, z, customdata: details,
     colorscale: [[0, colors.low], [0.5, colors.mid], [1, colors.high]],
-    colorbar: { title: statisticLabel(statistic), thickness: 14 },
+    colorbar: { title: { text: statisticLabel(statistic) }, thickness: 14 },
     hovertemplate: "User %{y} vs user %{x}<br>%{customdata}<extra></extra>"
   }], layout({
-    xaxis: { title: "Participant", side: "bottom" },
-    yaxis: { title: "Participant", autorange: "reversed", scaleanchor: "x" },
+    xaxis: { title: { text: "Participant" }, side: "bottom", constrain: "domain", zeroline: false, dtick: 1 },
+    yaxis: { title: { text: "Participant" }, autorange: "reversed", scaleanchor: "x", constrain: "domain", zeroline: false, dtick: 1 },
     margin: { l: 72, r: 30, t: 24, b: 62 }
   }), plotConfig);
   const stats = summary(rows, statistic);
@@ -594,7 +594,7 @@ function renderRanking(rows) {
     text: ranking.map(row => formatValue(row.value)), textposition: "auto",
     hovertemplate: "%{y}<br>Mean " + statisticLabel(statistic) + " %{x:.4f}<extra></extra>"
   }], layout({
-    xaxis: { title: `Mean ${statisticLabel(statistic)}`, gridcolor: theme().border },
+    xaxis: { title: { text: `Mean ${statisticLabel(statistic)}` }, gridcolor: theme().border },
     yaxis: { automargin: true }
   }), plotConfig);
 }
@@ -613,8 +613,8 @@ function renderProfiles() {
     customdata: medianRows.map(row => row.n_sessions),
     hovertemplate: "%{x}<br>Median instability %{y:.4f}<br>IQR %{error_y.array:.4f}<br>%{customdata} sessions<extra></extra>"
   }], layout({
-    xaxis: { title: "Participant" },
-    yaxis: { title: "Session distance", gridcolor: theme().border }
+    xaxis: { title: { text: "Participant" } },
+    yaxis: { title: { text: "Session distance" }, gridcolor: theme().border }
   }), plotConfig);
 }
 
@@ -637,8 +637,8 @@ function renderMismatch() {
     };
   });
   Plotly.react("mismatch-chart", traces, layout({
-    xaxis: { title: "Participant" },
-    yaxis: { title: `${label(metricFilter.value)} mismatch`, gridcolor: theme().border },
+    xaxis: { title: { text: "Participant" } },
+    yaxis: { title: { text: `${label(metricFilter.value)} mismatch` }, gridcolor: theme().border },
     showlegend: false,
     margin: { l: 72, r: 20, t: 20, b: 60 }
   }), plotConfig);

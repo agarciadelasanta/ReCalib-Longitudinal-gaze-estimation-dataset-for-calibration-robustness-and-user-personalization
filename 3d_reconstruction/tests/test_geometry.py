@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from recalib_labelling.geometry import (FACE_CENTROID_HEAD_MM, eye_midpoint_cam,
+from recalib_reconstruction.geometry import (FACE_CENTROID_HEAD_MM, eye_midpoint_cam,
                                         mediapipe_translation_to_real_camera, orthonormalize,
                                         screen_target_mm, virtual_focal_length_px)
 

@@ -97,8 +97,7 @@ def main():
     ap.add_argument("--landmarks", choices=("dlib", "json", "dlib_then_json"), default="dlib")
     ap.add_argument("--face-model", type=Path, default=EVAL_DIR / "face_model.txt")
     ap.add_argument("--camera-npz", type=Path)
-    ap.add_argument("--shape-predictor", type=Path,
-                    default=EVAL_DIR / "modules" / "shape_predictor_68_face_landmarks.dat")
+    ap.add_argument("--shape-predictor", type=Path, help="local dlib 68-point model (default: downloaded from dlib.net on first use and cached in ~/.cache/recalib_evaluation)")
     ap.add_argument("--num-workers", type=int, default=8)
     ap.add_argument("--depth-range", type=float, nargs=2, default=(300.0, 900.0), metavar=("MIN", "MAX"),
                     help="valid ETH face-centre depth in mm (camera z)")
@@ -107,6 +106,8 @@ def main():
     args = ap.parse_args()
 
     codes = set(args.discard_codes.split(","))
+    if "2" in codes:
+        ap.error("discard code 2 frames have no gaze labels (MediaPipe found no usable face), so they cannot be used")
     with open(args.release_root / "recalib_index.csv", newline="", encoding="utf-8") as fh:
         rows = [r for r in csv.DictReader(fh) if r["discard_code"] in codes][:: args.every]
     rows = rows[: args.limit] if args.limit else rows
@@ -118,10 +119,15 @@ def main():
     vec = np.array([[float(r[f"gaze_vector_{a}"]) for a in "xyz"] for r in rows])
     origin = np.array([[float(r[f"gaze_origin_mm_{a}"]) for a in "xyz"] for r in rows])
 
+    shape_predictor = None
+    if args.landmarks != "json":
+        from dlib_model import ensure_shape_predictor
+        shape_predictor = ensure_shape_predictor(args.shape_predictor)  # downloaded once, before the workers start
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     loader = torch.utils.data.DataLoader(
         ReleaseFrames(args.release_root, rows, load_face_model(str(args.face_model)), camera, distortion,
-                      args.landmarks, str(args.shape_predictor), args.depth_range),
+                      args.landmarks, shape_predictor, args.depth_range),
         batch_size=32, num_workers=args.num_workers, shuffle=False,
         worker_init_fn=_worker_init)
     failures = []

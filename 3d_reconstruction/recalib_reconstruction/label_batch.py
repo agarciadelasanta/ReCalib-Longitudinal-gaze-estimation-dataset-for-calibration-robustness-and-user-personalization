@@ -1,6 +1,6 @@
 """Label many images listed in a CSV.
 
-    python -m recalib_labelling.label_batch --csv targets.csv --images-root DIR --setup setup.json --out-dir OUT
+    python -m recalib_reconstruction.label_batch --csv targets.csv --images-root DIR --setup setup.json --out-dir OUT
 
 The CSV needs the columns image (path relative to --images-root), pog_px_x and pog_px_y;
 optional columns user_id, session_id, task_id, sample_id and task_type are copied to the JSON.
@@ -10,7 +10,7 @@ with --csv recalib_index.csv --images-root <release root>.
 One JSON per image is written to --out-dir, mirroring the relative image path.
 
 --depth-scale user_depth_scale.csv applies each user's face scale (see face_scale.py); the ReCalib
-factors are in labelling/user_depth_scale.csv. Without it the canonical face size is used (factor 1).
+factors are in 3d_reconstruction/user_depth_scale.csv. Without it the canonical face size is used (factor 1).
 """
 import argparse
 import csv

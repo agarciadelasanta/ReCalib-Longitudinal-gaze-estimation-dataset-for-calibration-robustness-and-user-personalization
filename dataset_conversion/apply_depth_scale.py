@@ -1,10 +1,12 @@
 """Apply the per-user face scale to the released labels (gaze origin, gaze vector, head translation).
 
     python dataset_conversion/apply_depth_scale.py --release-root ReCalib \
-        --factors labelling/user_depth_scale.csv --canonical recalib_index_canonical_face.csv
+        --factors 3d_reconstruction/user_depth_scale.csv --canonical recalib_index_canonical_face.csv
 
 The first run copies recalib_index.csv (labels with MediaPipe's canonical face size) to --canonical,
-outside the release. Every run starts from that copy, so running it again does not rescale twice.
+outside the release. Every run takes the canonical origin and translation from that copy, so running it
+again does not rescale twice; all other columns of recalib_index.csv (e.g. ones added by later steps)
+are kept as they are.
 For each labelled sample with factor s of its user:
     origin_mm      = s * canonical origin_mm
     translation_mm = s * canonical translation_mm
@@ -22,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labelling"))
-from recalib_labelling.face_scale import load_factors  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "3d_reconstruction"))
+from recalib_reconstruction.face_scale import load_factors  # noqa: E402
 
 
 def r(values, digits):
@@ -43,19 +45,25 @@ def main(argv=None) -> int:
         print(f"canonical-face labels saved to {args.canonical}")
     factors = load_factors(args.factors)
     with open(args.canonical, newline="", encoding="utf-8") as fh:
+        canonical = {c["image"]: c for c in csv.DictReader(fh)}
+    with open(index, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         fields, rows = reader.fieldnames, list(reader)
+    missing = [row["image"] for row in rows if row["image"] not in canonical]
+    if missing:
+        raise SystemExit(f"{len(missing)} samples of {index} are not in {args.canonical}, e.g. {missing[0]}")
 
     n_scaled = 0
     start = time.time()
     for k, row in enumerate(rows, 1):
-        if row["gaze_origin_mm_z"] in ("", None):
+        c = canonical[row["image"]]
+        if c["gaze_origin_mm_z"] in ("", None):
             continue
         s = factors[row["user_id"]]
-        origin = np.array([float(row[f"gaze_origin_mm_{a}"]) for a in "xyz"]) * s
+        origin = np.array([float(c[f"gaze_origin_mm_{a}"]) for a in "xyz"]) * s
         pog = np.array([float(row[f"gaze_pog_mm_{a}"]) for a in "xyz"])
         vector = (pog - origin) / np.linalg.norm(pog - origin)
-        trans = np.array([float(row[f"head_translation_mm_{a}"]) for a in "xyz"]) * s
+        trans = np.array([float(c[f"head_translation_mm_{a}"]) for a in "xyz"]) * s
         origin, vector, trans = r(origin, 4), r(vector, 6), r(trans, 4)
         for i, a in enumerate("xyz"):
             row[f"gaze_origin_mm_{a}"], row[f"gaze_vector_{a}"], row[f"head_translation_mm_{a}"] = origin[i], vector[i], trans[i]

@@ -69,7 +69,9 @@ def frame_metrics(pitchyaw, R, face_center, pog_mm):
 class ReCalibFrames(torch.utils.data.Dataset):
     """Loads and normalizes one frame; a failure yields a zero patch and ok=False, never an exception."""
 
-    def __init__(self, pairs, face_model, camera, distortion, source="dlib", shape_predictor=None):
+    def __init__(self, pairs, face_model, camera, distortion, source="dlib", shape_predictor=None,
+                 depth_range=(300.0, 900.0)):
+        self.depth_range = depth_range
         self.pairs, self.face_model, self.camera, self.distortion = pairs, face_model, camera, distortion
         self.source, self.shape_predictor = source, shape_predictor
         self._dlib = None  # built lazily, once per worker
@@ -101,8 +103,11 @@ class ReCalibFrames(torch.utils.data.Dataset):
             data = json.loads(js.read_text())
             item.update(user=str(data.get("user_id", "")), session=str(data.get("session_id", "")),
                         task=str(data.get("task_id", "")), task_type=str(data.get("task_type", "")),
-                        discarded=int(data.get("discard_info") is not None),
-                        pog_mm=np.asarray(data["gaze"]["pog_mm"], np.float64))
+                        discarded=int(data.get("discard_info") is not None))
+            if data.get("gaze") is None:  # discard code 2: MediaPipe found no usable face
+                item["reason"] = "no_gaze_label"
+                return item
+            item.update(pog_mm=np.asarray(data["gaze"]["pog_mm"], np.float64))
             image = cv2.imread(str(png))
             if image is None:
                 item["reason"] = "imread_failed"
@@ -112,6 +117,10 @@ class ReCalibFrames(torch.utils.data.Dataset):
                 item["reason"] = "no_landmarks"
                 return item
             img_norm, R, face_center = prepare_frame(image, lm, self.face_model, self.camera, self.distortion)
+            if not self.depth_range[0] <= face_center[2] <= self.depth_range[1]:
+                # false dlib detection (another face or background), as in prepare_protocol_h5.py
+                item["reason"] = f"implausible_face_depth: {face_center[2]:.0f} mm"
+                return item
             rgb = img_norm[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) / 255.0
             item.update(x=(rgb - IMAGENET_MEAN) / IMAGENET_STD, R=R, face_center=face_center, ok=1)
         except Exception as exc:  # one bad frame must not stop a 150k-frame run
@@ -159,8 +168,9 @@ def main():
     ap.add_argument("--landmarks", choices=("dlib", "json", "dlib_then_json"), default="dlib",
                     help="landmark source: dlib on the image (default, image-only), the JSON MediaPipe "
                          "landmarks, or dlib with the JSON as fallback when no face is found")
-    ap.add_argument("--shape-predictor", type=Path,
-                    default=EVAL_DIR / "modules" / "shape_predictor_68_face_landmarks.dat")
+    ap.add_argument("--shape-predictor", type=Path, help="local dlib 68-point model (default: downloaded from dlib.net on first use and cached in ~/.cache/recalib_evaluation)")
+    ap.add_argument("--depth-range", type=float, nargs=2, default=(300.0, 900.0), metavar=("MIN", "MAX"),
+                    help="valid ETH face-centre depth in mm (camera z); frames outside are failures")
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--num-workers", type=int, default=4)
     ap.add_argument("--device", default="auto")
@@ -189,9 +199,13 @@ def main():
         pairs = [p for p in pairs if p[0].name not in done]
         print(f"resuming: {len(done)} frames already in {args.out}")
     print(f"{len(pairs)} PNG+JSON pairs, device={device}, fx={camera[0, 0]:.2f} fy={camera[1, 1]:.2f}")
+    shape_predictor = None
+    if args.landmarks != "json":
+        from dlib_model import ensure_shape_predictor
+        shape_predictor = ensure_shape_predictor(args.shape_predictor)  # downloaded once, before the workers start
     loader = torch.utils.data.DataLoader(
         ReCalibFrames(pairs, load_face_model(str(args.face_model)), camera, distortion,
-                      args.landmarks, str(args.shape_predictor)),
+                      args.landmarks, shape_predictor, tuple(args.depth_range)),
         batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False,
         persistent_workers=args.num_workers > 0, worker_init_fn=_worker_init)
 

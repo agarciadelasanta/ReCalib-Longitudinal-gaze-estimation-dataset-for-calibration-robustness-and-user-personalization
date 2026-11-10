@@ -153,14 +153,14 @@ class ETHXGazeEstimator:
             face_model_path="face_model.txt",
             ckpt_path="./ckpt/epoch_24_ckpt.pth.tar",
             device="cuda",
-            shape_predictor_path="./modules/shape_predictor_68_face_landmarks.dat",  # dlib fallback only
+            shape_predictor_path=None,  # None: cached dlib model, downloaded on first use
         )
 
         gaze_vec = est.predict_gaze_vector("some.png")  # camera-frame unit vector, shape (3,)
 
     Camera intrinsics default to docs/camera_intrinsics.npz. Pass camera_npz_path /
     camera_xml_path to override them. Inputs are the image and the intrinsics only: landmarks come
-    from dlib on the image (landmark_source="dlib", needs shape_predictor_path). "json" uses the
+    from dlib on the image (landmark_source="dlib"; shape_predictor_path, or downloaded if None). "json" uses the
     dataset's MediaPipe landmarks (corrected order) and "dlib_then_json" falls back to them; both
     use model estimates stored in the JSON, so they are not image-only.
     """
@@ -179,8 +179,6 @@ class ETHXGazeEstimator:
     ):
         if landmark_source not in ("dlib", "json", "dlib_then_json"):
             raise ValueError(f"unknown landmark_source: {landmark_source}")
-        if landmark_source != "json" and shape_predictor_path is None:
-            raise ValueError("landmark_source 'dlib' needs shape_predictor_path")
         self.landmark_source = landmark_source
         # device
         if device == "auto":
@@ -200,7 +198,7 @@ class ETHXGazeEstimator:
         self.predictor = None
         self.face_detector = None
         self._cnn = False
-        if shape_predictor_path is not None:
+        if landmark_source != "json" or shape_predictor_path is not None:
             import dlib
             from dlib_model import ensure_shape_predictor
             self.predictor = dlib.shape_predictor(ensure_shape_predictor(shape_predictor_path))
@@ -243,7 +241,7 @@ class ETHXGazeEstimator:
     def detect_landmarks_dlib(self, image_bgr) -> np.ndarray | None:
         """(6,1,2) landmarks in ETH order from dlib, or None if no face is found."""
         if self.predictor is None:
-            raise RuntimeError("dlib fallback requested but shape_predictor_path was not given")
+            raise RuntimeError("dlib landmarks requested but the estimator uses landmark_source='json'")
         return dlib_eth_landmarks(self.face_detector, self.predictor, image_bgr, self._cnn)
 
     def _landmarks_json(self, png_path):
@@ -303,7 +301,6 @@ if __name__ == "__main__":
     est = ETHXGazeEstimator(
         face_model_path=os.path.join(REPO_ROOT, "evaluation", "face_model.txt"),
         ckpt_path=os.path.join(REPO_ROOT, "evaluation", "ckpt", "epoch_24_ckpt.pth.tar"),
-        shape_predictor_path=os.path.join(REPO_ROOT, "evaluation", "modules", "shape_predictor_68_face_landmarks.dat"),
         device="cpu",
     )
     auxFileName = os.path.join(REPO_ROOT, "example", "07_00_02_img-0039.png")

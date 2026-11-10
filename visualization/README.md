@@ -8,7 +8,7 @@ python -m pip install -r requirements-visualization.txt
 
 ## `explore_dataset.py`: dataset overview
 
-Builds a self-contained interactive HTML report from the bundled `dataset_summary.csv`, so it works without the restricted images. It has cascading participant, session and task filters, exact sample counts, longitudinal session coverage and a per-session breakdown (Overview tab), and the screen-target, head-rotation and head-position distributions per task (Sample distributions tab). The screen-target panel acts as a cross-filter for the rest of the report.
+Builds a self-contained interactive HTML report from the bundled `recalib_index.csv`, so it works without the restricted images. It has cascading participant, session and task filters, exact sample counts, longitudinal session coverage and a per-session breakdown (Overview tab), and the screen-target, head-rotation and head-position distributions per task (Sample distributions tab). The screen-target panel acts as a cross-filter for the rest of the report.
 
 ```bash
 python visualization/explore_dataset.py                 # writes temp/recalib_dataset_explorer.html
@@ -26,7 +26,10 @@ Shows the labels of one image: the target and gaze intersection on the screen, t
 python visualization/visualize_sample.py
 python visualization/visualize_sample.py path/to/sample.png
 python visualization/visualize_sample.py --no-display        # non-interactive check
+python visualization/visualize_sample.py --save-dir docs/assets   # write the three views instead of displaying them
 ```
+
+With `--save-dir` the 3D view is written as interactive HTML, and also as PNG when plotly's image export (`kaleido`) is installed. The figures below were made this way from the bundled example, with the ETH-XGaze prediction (`--checkpoint evaluation/ckpt/epoch_24_ckpt.pth.tar --save-dir docs/assets`); the 3D PNG is a screenshot of the HTML. The 2D screen view shows the target, the predicted point of gaze and the camera, with the angular and on-screen error. The prediction is zero-shot, so its error (17° here) is not a measure of the labels.
 
 Optionally it overlays the prediction of an ETH-XGaze model and reports its angular error. This needs the full `requirements.txt` and the checkpoint linked in `evaluation/ckpt/readme.txt`:
 
@@ -40,7 +43,7 @@ python visualization/visualize_sample.py --checkpoint evaluation/ckpt/epoch_24_c
 
 ## `main_gaze_visualization.py`: distributions of a participant, session or task
 
-Histograms, KDE heat maps and scatter plots of head pose, gaze vectors and gaze intersections, comparing calibration and test tasks, the sessions of a participant, or the tasks of a session. Reads `dataset_summary.csv` (participant 7 by default) and exports the figures and a filtered CSV to `temp/`.
+Histograms, KDE heat maps and scatter plots of head pose, gaze vectors and gaze intersections, comparing calibration and test tasks, the sessions of a participant, or the tasks of a session. Reads `recalib_index.csv` (participant 7 by default) and exports the figures and a filtered CSV to `temp/`.
 
 ```bash
 python visualization/main_gaze_visualization.py
@@ -48,9 +51,11 @@ python visualization/main_gaze_visualization.py --id-user 7 --id-session 13 --id
 python visualization/main_gaze_visualization.py --all-users --no-plots --no-export
 ```
 
-| Task: `hpe_t_z` vs `hpe_t_x` | Session: `hpe_t_z` vs `hpe_t_x` | Participant: normalized PoG |
+| Session 13 of participant 7, per task: `hpe_t_z` vs `hpe_t_x` | Participant 7, calibration vs test: `hpe_t_z` vs `hpe_t_x` | Participant 7: normalized PoG |
 | :---: | :---: | :---: |
 | ![Task](../docs/assets/07_13_hpe_t_z_vs_hpe_t_x_task.png) | ![Session](../docs/assets/07_hpe_t_z_vs_hpe_t_x_task_type.png) | ![PoG](../docs/assets/07_pog_intersect_norm.png) |
+
+These come from `--id-user 7 --id-session 13` (`hpe_t_z_vs_hpe_t_x_task_breakdown.png`) and `--id-user 7` (`overall_coverage_hpe_t_x_vs_z.png`, `normalized_pog_mm.png`). Only samples kept after quality filtering are plotted; axis limits are set in `gaze_analyisis_params.yaml`.
 
 ## `explore_statistical_analysis.py`
 

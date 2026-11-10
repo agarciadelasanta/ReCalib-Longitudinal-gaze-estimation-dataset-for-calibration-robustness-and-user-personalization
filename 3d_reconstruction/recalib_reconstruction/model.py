@@ -8,7 +8,7 @@ from pathlib import Path
 MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/face_landmarker/"
              "face_landmarker/float16/1/face_landmarker.task")
 MODEL_SHA256 = "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
-DEFAULT_CACHE = Path(os.environ.get("RECALIB_LABELLING_CACHE", Path.home() / ".cache" / "recalib_labelling"))
+DEFAULT_CACHE = Path(os.environ.get("RECALIB_RECONSTRUCTION_CACHE", Path.home() / ".cache" / "recalib_reconstruction"))
 
 
 def sha256(path: Path) -> str:
@@ -23,7 +23,7 @@ def ensure_model(path=None) -> Path:
     """Return the path of a verified face_landmarker.task, downloading it if needed.
 
     path: explicit model file to use (verified, never downloaded). By default the model is
-    cached in ~/.cache/recalib_labelling (override with RECALIB_LABELLING_CACHE).
+    cached in ~/.cache/recalib_reconstruction (override with RECALIB_RECONSTRUCTION_CACHE).
     """
     if path is not None:
         model = Path(path)

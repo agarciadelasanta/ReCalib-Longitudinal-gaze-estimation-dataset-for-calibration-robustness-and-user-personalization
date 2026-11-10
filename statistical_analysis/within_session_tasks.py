@@ -65,7 +65,7 @@ def session_metrics(k):
         cal = ses[ses.task_id == "00"]
         tests = {t: g for t, g in ses.groupby("task_id") if t != "00"}
         if len(cal) < 20 or len(tests) < 3 or min(len(g) for g in tests.values()) < 20:
-            continue  # incomplete sessions (see incomplete_tasks.csv) are excluded
+            continue  # sessions without a calibration task and three test tasks of >= 20 kept frames
         ts = sorted(tests)
         c_rot, c_pos = cal[ROT].median().to_numpy(), cal[POS].median().to_numpy()
         med_rot = {t: tests[t][ROT].median().to_numpy() for t in ts}
@@ -238,7 +238,7 @@ def main():
     pu = T[T.scope != "all"].pivot(index="scope", columns="test", values="p_value")
     pu.columns = ["pos t1<t23", "rot t1<t23", "spread test>calib"]
     print(pu.round(4).to_string())
-    print(f"\nexcluded incomplete sessions: {k.groupby(['user_id', 'session_id']).ngroups - len(S)}")
+    print(f"\nexcluded sessions (fewer than 3 test tasks or 20 kept frames in a task): {k.groupby(['user_id', 'session_id']).ngroups - len(S)}")
 
 
 if __name__ == "__main__":

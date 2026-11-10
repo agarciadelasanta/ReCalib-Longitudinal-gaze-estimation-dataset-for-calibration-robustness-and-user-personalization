@@ -196,7 +196,10 @@ def main():
 
     fieldnames = list(FIELDNAMES)
     if args.eth_csv:
-        add_eth_labels(rows, args.eth_csv, setup)
+        if add_eth_labels(rows, args.eth_csv, setup):
+            # a target mismatch means the CSV is not aligned with this release (e.g. made before the
+            # samples were renumbered); frames next to a mismatch would then get another frame's prediction
+            raise SystemExit(f"{args.eth_csv} does not match this release; nothing written")
         fieldnames += ["eth_available"] + list(ETH_COLUMNS.values())
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

@@ -36,7 +36,7 @@ class trackingEnviroment3DPlotter():
     def appendCircle(self, point, radius, name):
         self.circleV.append((np.squeeze(point), radius, name))
 
-    def plot(self):
+    def plot(self, save_path=None):
         for aux in self.axisV:
             addAxis(self.fig, aux[0], aux[1])
 
@@ -59,7 +59,7 @@ class trackingEnviroment3DPlotter():
         for aux in self.circleV:
             addCircle(self.fig, aux[0], aux[1], aux[2])
 
-        show3D(self.fig)
+        show3D(self.fig, save_path)
     
 def init3D():
     fig = go.Figure()
@@ -192,7 +192,7 @@ def addLine(fig, line, title):
 
 
 
-def show3D(fig):    
+def show3D(fig, save_path=None):
     camera = dict(
         up=dict(x=0, y=-1, z=0),
         center=dict(x=0, y=0, z=0),
@@ -200,7 +200,16 @@ def show3D(fig):
     )    
     fig.update_layout(scene_camera=camera,
                       scene_aspectmode='data')
-    plot(fig, auto_open=True)
+    if save_path is None:
+        plot(fig, auto_open=True)
+        return
+    # Interactive HTML always; PNG only when plotly's image export (kaleido) is available
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+    fig.write_html(str(save_path.with_suffix('.html')))
+    try:
+        fig.write_image(str(save_path), width=1200, height=700)
+    except Exception as exc:
+        print(f"3D view saved as HTML only (PNG export needs kaleido: {exc.__class__.__name__})")
 
 
 #fig.update_layout(scene = dict(

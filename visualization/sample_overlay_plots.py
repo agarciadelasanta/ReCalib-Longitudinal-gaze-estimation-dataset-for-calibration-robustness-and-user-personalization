@@ -15,7 +15,7 @@ LMK_NOSE_TIP = "4"
 LMK_HEAD_CENTER = "168" # Approx. center of the head model
 
 
-def overlay_visualization(image_path, json_path, pred_vector=None):
+def overlay_visualization(image_path, json_path, pred_vector=None, save_path=None):
     """
     Visualizes 2D landmarks with index numbers, GT gaze, estimated vector, 
     and full metadata with large text.
@@ -44,11 +44,12 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
 
     # --- 2. Identify Midpoint for Gaze Origin using Specific Landmark IDs ---
     try:
-        # Use the head center landmark as the origin for the visualized vector
-        start_point = tuple(map(int, landmarks[LMK_HEAD_CENTER]))
+        # The gaze origin of the labels is the midpoint between the eyes: draw the vector from
+        # the mean of the four eye corners
+        key_lmk_ids = [LMK_LEFT_EYE_INNER, LMK_RIGHT_EYE_INNER, LMK_LEFT_EYE_OUTER, LMK_RIGHT_EYE_OUTER]
+        start_point = tuple(int(round(v)) for v in np.mean([landmarks[k] for k in key_lmk_ids], axis=0))
         
         # Highlight selected eye corners for visibility
-        key_lmk_ids = [LMK_LEFT_EYE_INNER, LMK_RIGHT_EYE_INNER, LMK_LEFT_EYE_OUTER, LMK_RIGHT_EYE_OUTER]
         for lmk_id in key_lmk_ids:
             pt = landmarks[lmk_id]
             cv2.circle(img, (int(pt[0]), int(pt[1])), 8, (255, 255, 0), -1)
@@ -93,7 +94,7 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
     cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
 
     # Define text entries and their colors
-    legend_items = [("Landmarks", (0, 255, 0)), ("GT Gaze", (0, 0, 255))]
+    legend_items = [("Landmarks", (0, 255, 0)), ("Gaze vector", (0, 0, 255))]
     if pred_vector is not None:
         legend_items.append(("Pred Gaze", (255, 0, 0)))
     
@@ -103,6 +104,9 @@ def overlay_visualization(image_path, json_path, pred_vector=None):
         cv2.putText(img, text, (legend_x + 15, legend_y + 80 + i * 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
 
     # --- Rendering ---
+    if save_path is not None:
+        cv2.imwrite(str(save_path), img)
+        return
     cv2.namedWindow("Gaze & Landmark Visualizer", cv2.WINDOW_NORMAL)
     cv2.imshow("Gaze & Landmark Visualizer", img)
     cv2.waitKey(0)

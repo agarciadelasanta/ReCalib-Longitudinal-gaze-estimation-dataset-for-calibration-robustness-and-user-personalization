@@ -5,7 +5,7 @@
         --compare-index ReCalib/recalib_index.csv
 
 --labels is a folder of JSON annotations in the release format, e.g. the output of
-labelling/recalib_labelling/label_batch.py. The rules, applied in this order (first match wins):
+3d_reconstruction/recalib_reconstruction/label_batch.py. The rules, applied in this order (first match wins):
 
   2  HPE_MODEL_ERROR        no face or no usable landmarks (gaze/head_pose are null; set by the labelling)
   5  LANDMARKS_OUT_OF_RANGE any of the 12 eye and iris landmarks (33, 133, 263, 362, 469-472, 474-477)

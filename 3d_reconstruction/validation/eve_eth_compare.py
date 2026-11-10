@@ -1,6 +1,6 @@
 """Compare the ETH-XGaze eye centre with the EVE ground truth, on the frames of eve_compare.py.
 
-    python labelling/validation/eve_eth_compare.py --compare H:/EVE/relabel_eval/eve_compare_all.csv \
+    python 3d_reconstruction/validation/eve_eth_compare.py --compare H:/EVE/relabel_eval/eve_compare_all.csv \
         --frames-root H:/EVE/Mamu_untagged --h5-root H:/EVE/Extracted_webcam_h5 \
         --out H:/EVE/relabel_eval/eve_eth_compare_all.csv [--workers 12]
 
@@ -79,7 +79,7 @@ def main():
     ap.add_argument("--h5-root", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--workers", type=int, default=12)
-    ap.add_argument("--shape-predictor", help="dlib 68-point model (default: evaluation/dlib_model.py, downloaded on first use)")
+    ap.add_argument("--shape-predictor", help="local dlib 68-point model (default: downloaded from dlib.net on first use and cached in ~/.cache/recalib_evaluation)")
     args = ap.parse_args()
     from dlib_model import ensure_shape_predictor
     shape_predictor = ensure_shape_predictor(args.shape_predictor)
