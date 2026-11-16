@@ -4,7 +4,8 @@
         --user 05 --out <paper>/assets/figures
 
 Kept samples of one participant, calibration vs. test tasks (panels a-f) and calibration tasks per
-session (g, h). Angles in degrees, positions in mm in the camera frame (x to the image right, y down,
+session (g, h). Each panel is drawn at its printed size in the paper (a quarter of the text width) with
+identical margins, so the plots line up; there is no legend or colour bar (the caption gives the colours). Angles in degrees, positions in mm in the camera frame (x to the image right, y down,
 z away from the camera). Writes one PNG per panel, with the file names used by main.tex:
   a  gaze direction (yaw, pitch)             smooth_coverage_map_gt_gaze_x_vs_gt_gaze_y.png
   b  head rotation, yaw vs pitch             smooth_coverage_map_hpe_r_x_vs_hpe_r_y.png
@@ -27,12 +28,17 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.patches import Rectangle
+from matplotlib.ticker import MaxNLocator
 
 CALIB, TEST = "#2a78d6", "#eb6834"              # categorical: calibration (blue), test (orange)
 INK, MUTED = "#0b0b0b", "#52514e"
 MAX_POINTS = 5000                               # per KDE, for speed
-plt.rcParams.update({"font.size": 20, "axes.labelsize": 26, "xtick.labelsize": 20, "ytick.labelsize": 20,
-                     "legend.fontsize": 22, "axes.edgecolor": MUTED, "axes.labelcolor": INK,
+PANEL_IN = (1.56, 1.40)                         # 0.24 x 6.5 in text width, as printed
+MARGINS = dict(left=0.25, right=0.97, bottom=0.22, top=0.97)
+plt.rcParams.update({"font.size": 6, "axes.labelsize": 7, "xtick.labelsize": 6, "ytick.labelsize": 6,
+                     "axes.linewidth": 0.5, "xtick.major.width": 0.5, "ytick.major.width": 0.5,
+                     "xtick.major.size": 2, "ytick.major.size": 2, "xtick.major.pad": 1.5, "ytick.major.pad": 1.5,
+                     "axes.labelpad": 1.5, "axes.edgecolor": MUTED, "axes.labelcolor": INK,
                      "xtick.color": MUTED, "ytick.color": MUTED})
 
 
@@ -57,33 +63,36 @@ def sample(df):
     return df.sample(min(len(df), MAX_POINTS), random_state=0)
 
 
-def kde(ax, df, x, y, color, label=None):
+def panel():
+    fig, ax = plt.subplots(figsize=PANEL_IN)
+    fig.subplots_adjust(**MARGINS)
+    return fig, ax
+
+
+def kde(ax, df, x, y, color):
     sns.kdeplot(data=sample(df), x=x, y=y, fill=True, levels=8, thresh=0.05, alpha=0.55, color=color, ax=ax)
-    sns.kdeplot(data=sample(df), x=x, y=y, fill=False, levels=8, thresh=0.05, linewidths=0.6, color=color, ax=ax)
-    if label:
-        ax.plot([], [], color=color, lw=10, alpha=0.7, label=label)
+    sns.kdeplot(data=sample(df), x=x, y=y, fill=False, levels=8, thresh=0.05, linewidths=0.3, color=color, ax=ax)
 
 
-def finish(ax, xlabel, ylabel, path, legend=True, invert_y=False, equal=False):
+def finish(ax, xlabel, ylabel, path, invert_y=False, equal=False):
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.grid(color="#e4e3df", lw=0.8)
+    ax.xaxis.set_major_locator(MaxNLocator(4, steps=[1, 2, 5, 10]))
+    ax.yaxis.set_major_locator(MaxNLocator(4, steps=[1, 2, 5, 10]))
+    ax.grid(color="#e4e3df", lw=0.4)
     ax.set_axisbelow(True)
     if equal:
         ax.set_aspect("equal", adjustable="datalim")
     if invert_y:
         ax.invert_yaxis()
-    if legend:
-        ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, frameon=False, handlelength=1.2, columnspacing=1.2)
-    ax.figure.tight_layout()
-    ax.figure.savefig(path, dpi=200, facecolor="white")
+    ax.figure.savefig(path, dpi=600, facecolor="white")
     plt.close(ax.figure)
 
 
 def two_tasks(d, x, y, xlabel, ylabel, path, **kw):
-    fig, ax = plt.subplots(figsize=(6, 5))
-    kde(ax, d[d.task_type == "test"], x, y, TEST, "test")
-    kde(ax, d[d.task_type == "calibration"], x, y, CALIB, "calibration")
+    fig, ax = panel()
+    kde(ax, d[d.task_type == "test"], x, y, TEST)
+    kde(ax, d[d.task_type == "calibration"], x, y, CALIB)
     finish(ax, xlabel, ylabel, path, **kw)
 
 
@@ -91,16 +100,11 @@ def per_session(d, x, y, xlabel, ylabel, path, **kw):
     cal = d[d.task_type == "calibration"]
     sessions = sorted(cal.session_id.unique())
     cmap = plt.get_cmap("Blues")
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = panel()
     for k, s in enumerate(sessions):                                # chronological: light (first) -> dark (last)
         color = cmap(0.35 + 0.6 * k / max(len(sessions) - 1, 1))
         sns.kdeplot(data=cal[cal.session_id == s], x=x, y=y, fill=True, levels=5, thresh=0.05, alpha=0.6, color=color, ax=ax)
-    sm = plt.cm.ScalarMappable(cmap=matplotlib.colors.LinearSegmentedColormap.from_list("s", [cmap(0.35), cmap(0.95)]),
-                               norm=plt.Normalize(1, len(sessions)))
-    cb = fig.colorbar(sm, ax=ax, pad=0.02, ticks=[1, len(sessions)])
-    cb.set_label("session", fontsize=22)
-    cb.ax.tick_params(labelsize=18)
-    finish(ax, xlabel, ylabel, path, legend=False, **kw)
+    finish(ax, xlabel, ylabel, path, **kw)
 
 
 def main(argv=None) -> int:
@@ -125,12 +129,12 @@ def main(argv=None) -> int:
         setup_path = Path(__file__).resolve().parents[1] / "docs" / "setup.json"
     setup = json.loads(setup_path.read_text())
     scr, cam = setup["screen"], setup["camera"]["position_mm"]
-    fig, ax = plt.subplots(figsize=(6, 5))
-    kde(ax, d[d.task_type == "test"], "pog_x", "pog_y", TEST, "test")
-    kde(ax, d[d.task_type == "calibration"], "pog_x", "pog_y", CALIB, "calibration")
+    fig, ax = panel()
+    kde(ax, d[d.task_type == "test"], "pog_x", "pog_y", TEST)
+    kde(ax, d[d.task_type == "calibration"], "pog_x", "pog_y", CALIB)
     ax.add_patch(Rectangle((-scr["width_mm"] / 2 + cam["x"], cam["y"]), scr["width_mm"], scr["height_mm"],
-                           fill=False, ec=INK, lw=1.5, ls="--"))
-    ax.plot([0], [0], marker="s", color=INK, ms=7)                  # camera
+                           fill=False, ec=INK, lw=0.6, ls="--"))
+    ax.plot([0], [0], marker="s", color=INK, ms=2.5)                # camera
     finish(ax, "screen x (mm)", "screen y (mm)", n("pog_intersect_norm_x_vs_pog_intersect_norm_y"), invert_y=True, equal=True)
     two_tasks(d, "yaw", "roll", "head yaw (°)", "head roll (°)", n("hpe_r_x_vs_hpe_r_z"))
     per_session(d, "tx", "ty", "head x (mm)", "head y (mm)", n("hpe_t_x_vs_hpe_t_y_session"), invert_y=True)
