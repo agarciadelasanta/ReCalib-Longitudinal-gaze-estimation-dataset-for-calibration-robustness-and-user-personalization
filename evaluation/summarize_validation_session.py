@@ -23,7 +23,7 @@ import pandas as pd
 
 from summarize_protocol import p_wilcoxon, two_level_bootstrap
 
-IDS = {"user": str, "session": str, "val_session": str, "train_session": str, "test_session": str}
+IDS = {"user": str, "session": str, "val_session": str, "other_session": str, "train_session": str, "test_session": str}
 
 
 def main():
